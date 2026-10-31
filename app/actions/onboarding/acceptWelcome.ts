@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { audit } from "@/lib/audit";
 import { welcomeSchema } from "@/lib/schemas/onboarding";
+import { slugifyEmpresa } from "@/lib/tenants/slug-pure";
 import { requireOnboardingCtx, patchOnboardingState, OnboardingError } from "./_shared";
 
 export type AcceptWelcomeResult =
@@ -57,7 +58,11 @@ export async function acceptWelcome(formData: FormData): Promise<AcceptWelcomeRe
           ...(input.o_que_faz ? { o_que_faz: input.o_que_faz } : {}),
         },
       },
-      { display_name: input.display_name, timezone: input.timezone },
+      {
+        display_name: input.display_name,
+        timezone: input.timezone,
+        slug: slugifyEmpresa(input.display_name),
+      },
       { soNoWizard: true },
     );
   } catch (err) {

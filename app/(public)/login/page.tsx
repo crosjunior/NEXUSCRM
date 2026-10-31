@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { idiomaDoVisitante } from "@/lib/i18n/idiomaAnonimo";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { tituloDaTelaPublica } from "@/lib/i18n/titulo-da-tela-publica";
+import { resolveOrganizationBySlug } from "@/lib/tenants/slug";
 
 // A aba no idioma do visitante, como o corpo (`lib/i18n/titulo-da-tela-publica.ts`).
 export const generateMetadata = () => tituloDaTelaPublica((t) => t("Entrar"));
@@ -15,9 +16,10 @@ export const generateMetadata = () => tituloDaTelaPublica((t) => t("Entrar"));
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; reset?: string; error?: string }>;
+  searchParams: Promise<{ next?: string; reset?: string; error?: string; org?: string }>;
 }) {
-  const { next, reset, error } = await searchParams;
+  const { next, reset, error, org } = await searchParams;
+  const tenantOrg = org ? await resolveOrganizationBySlug(org) : null;
   const invite = typeof next === "string" ? next.match(/^\/team\/accept-invite\/([^/?#]+)$/)?.[1] : undefined;
   const convite = invite ? verifyInviteToken(invite) : null;
   // Fora da árvore de `app/app/layout.tsx` — sem `IdiomaProvider` do lado do
@@ -32,14 +34,40 @@ export default async function LoginPage({
     (user?.user_metadata?.locale as string | undefined) ?? null,
   );
   const t = (texto: string) => traduzir(texto, idioma);
-  const marca = await marcaDaSaida(null);
+  const marca = await marcaDaSaida(tenantOrg?.id ?? null);
+  const nomeExibido = tenantOrg ? tenantOrg.displayName : marca.nome;
 
   return (
     <div className="space-y-6">
+      {tenantOrg?.logoUrl && (
+        <div className="flex justify-center mb-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={tenantOrg.logoUrl}
+            alt={nomeExibido}
+            className="h-16 w-auto max-w-[200px] object-contain"
+          />
+        </div>
+      )}
       <div className="space-y-1.5 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">{t("Entrar")}</h1>
-        <p className="text-sm text-muted-foreground">{marca.nome}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {tenantOrg ? `${t("Entrar em")} ${nomeExibido}` : t("Entrar")}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {tenantOrg ? t("Acesso ao atendimento e CRM da empresa") : marca.nome}
+        </p>
       </div>
+      {tenantOrg && (
+        <div
+          className="rounded-lg border border-border/80 bg-surface/50 p-3 text-xs text-muted-foreground flex items-center gap-2"
+          style={{ borderLeftWidth: "4px", borderLeftColor: tenantOrg.accentHex }}
+        >
+          <span>🏢</span>
+          <span>
+            {t("Você está acessando o portal de atendimento da")} <strong>{nomeExibido}</strong>.
+          </span>
+        </div>
+      )}
       {reset === "success" && (
         <div
           className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm"

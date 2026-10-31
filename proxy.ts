@@ -6,6 +6,7 @@ import { fetchDoServidor } from "@/lib/supabase/fetch-do-servidor";
 import { urlDoSupabaseNoServidor } from "@/lib/supabase/url-do-servidor";
 import { isPublicPath } from "@/lib/auth/public-paths";
 import { CABECALHO_SEM_CSS, PARAMETRO_SEM_CSS } from "@/lib/branding/sem-css-personalizado";
+import { isReservedSlug } from "@/lib/tenants/slug-pure";
 import {
   verifyImpersonateCookieEdge,
   IMPERSONATE_COOKIE_NAME_EDGE,
@@ -96,6 +97,21 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Acesso direto pelo slug da empresa (ex.: /nomedaempresa ou /minhaempresa)
+  const isDirectTenantSlug =
+    /^\/[a-z0-9_-]{2,40}$/i.test(pathname) &&
+    !isReservedSlug(pathname.slice(1));
+
+  if (isDirectTenantSlug) {
+    const slugCandidate = pathname.slice(1).toLowerCase();
+    if (!user) {
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("org", slugCandidate);
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.redirect(new URL("/app/inbox", request.url));
+  }
 
   if (!user) {
     // API routes must respond with JSON envelope (contract: {error:{code,message}})

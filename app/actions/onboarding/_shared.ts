@@ -105,7 +105,7 @@ export async function loadOnboardingState(orgId: string): Promise<{
 export async function patchOnboardingState(
   orgId: string,
   patch: Partial<OnboardingState>,
-  extra?: { display_name?: string; timezone?: string },
+  extra?: { display_name?: string; timezone?: string; slug?: string },
   /**
    * `soNoWizard`: grava só se a organização ainda NÃO terminou o onboarding
    * e recusa com `org_ja_configurada` caso contrário. Só as boas-vindas pedem
@@ -132,13 +132,14 @@ async function gravarPatchDoOnboarding(
   orgId: string,
   state: OnboardingState,
   patch: Partial<OnboardingState>,
-  extra: { display_name?: string; timezone?: string } | undefined,
+  extra: { display_name?: string; timezone?: string; slug?: string } | undefined,
   opcoes: { soNoWizard?: boolean } | undefined,
 ): Promise<void> {
   const merged: OnboardingState = { ...state, ...patch };
   const update: Record<string, unknown> = { onboarding_state: merged };
   if (extra?.display_name) update.display_name = extra.display_name;
   if (extra?.timezone) update.timezone = extra.timezone;
+  if (extra?.slug) update.slug = extra.slug;
   if (!opcoes?.soNoWizard) {
     const { error } = await admin.from("organizations").update(update).eq("id", orgId);
     if (error) throw new OnboardingError("db_error", error.message);

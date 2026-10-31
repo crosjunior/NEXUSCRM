@@ -537,6 +537,16 @@ export const NAV_CATALOG = [
 
   // ---- Agente de IA — montar, ensinar, acompanhar ----
   {
+    href: "/app/onboarding-ia",
+    label: "Assistente de IA",
+    description: "Configure sua empresa, marca, produtos e funil enviando materiais e arquivos.",
+    icon: "Brain",
+    group: "ia",
+    section: "Montar o agente",
+    minRole: "manager",
+    sidebar: true,
+  },
+  {
     href: "/app/ai/agents",
     label: "Agentes",
     description: "Quem atende por você: instruções, modelo, ferramentas e publicação.",
