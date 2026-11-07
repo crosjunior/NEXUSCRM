@@ -100,6 +100,7 @@ export async function aplicarBlueprintAutonomo(
         .update({
           name: `${blueprint.brand_identity.name} Atendente`,
           description: `Atendente inteligente treinado para ${blueprint.brand_identity.name}`,
+          model: "gemini-3.5-flash",
           is_active: true,
         })
         .eq("id", agentId);
@@ -110,6 +111,7 @@ export async function aplicarBlueprintAutonomo(
           organization_id: organizationId,
           name: `${blueprint.brand_identity.name} Atendente`,
           description: `Atendente inteligente treinado para ${blueprint.brand_identity.name}`,
+          model: "gemini-3.5-flash",
           is_active: true,
         })
         .select("id")
@@ -141,7 +143,8 @@ export async function aplicarBlueprintAutonomo(
         agent_id: agentId,
         version_number: nextVersion,
         system_prompt: agentPrompt,
-        model: "gemini-2.5-flash",
+        provider: "google",
+        model: "gemini-3.5-flash",
         temperature: 0.3,
         status: "published",
         created_by: userId,

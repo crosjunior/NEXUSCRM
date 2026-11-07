@@ -30,3 +30,4 @@ scratchpad
 evidence
 .superpowers
 *.tsbuildinfo
+.runtime

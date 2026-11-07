@@ -272,7 +272,7 @@ export async function extrairConfiguracaoAutonoma(
     const prompt = montarPromptExtracao(input, scrapedIdentity);
 
     // Escada de modelos Gemini suportados em produção
-    const modelosParaTestar = ["gemini-3.8-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const modelosParaTestar = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
 
     for (const modelName of modelosParaTestar) {
       try {

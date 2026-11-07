@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Robot, Plus } from "@/lib/ui/icons";
+import { Robot, Plus, Sparkle } from "@/lib/ui/icons";
 import { useT } from "@/hooks/i18n/useT";
 import { useAgentsList } from "@/hooks/ai/useAgents";
 import type { AgentRow } from "@/hooks/ai/useAgent";
@@ -48,11 +48,18 @@ export function AgentsList({ initialData, canWrite }: Props) {
           )}
         </p>
         {canWrite && (
-          <Link href="/app/ai/agents/new">
-            <Button className="mt-1">
-              <Plus size={14} aria-hidden className="mr-2" /> {t("Criar novo")}
-            </Button>
-          </Link>
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/app/ai/agents/wizard">
+              <Button className="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white shadow-sm">
+                <Sparkle size={14} aria-hidden className="mr-2" /> {t("Criar com Assistente de IA")}
+              </Button>
+            </Link>
+            <Link href="/app/ai/agents/new">
+              <Button variant="outline">
+                <Plus size={14} aria-hidden className="mr-2" /> {t("Criar manual")}
+              </Button>
+            </Link>
+          </div>
         )}
       </Card>
     );
@@ -70,11 +77,18 @@ export function AgentsList({ initialData, canWrite }: Props) {
           onShowArchivedChange={setShowArchived}
         />
         {canWrite && (
-          <Link href="/app/ai/agents/new">
-            <Button>
-              <Plus size={14} aria-hidden className="mr-2" /> {t("Criar novo")}
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/app/ai/agents/wizard">
+              <Button className="bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white shadow-sm">
+                <Sparkle size={14} aria-hidden className="mr-2" /> {t("Assistente de IA")}
+              </Button>
+            </Link>
+            <Link href="/app/ai/agents/new">
+              <Button variant="outline">
+                <Plus size={14} aria-hidden className="mr-2" /> {t("Criar novo")}
+              </Button>
+            </Link>
+          </div>
         )}
       </div>
 

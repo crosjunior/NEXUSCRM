@@ -91,6 +91,7 @@ export {
   // painéis de evolução / aprendizado
   ChartLineUp,
   Lightbulb,
+  Lightning,
   // theme
   Sun,
   Moon,
@@ -132,6 +133,7 @@ export {
   CaretDoubleRight,
   CaretLeft,
   CaretRight,
+  ArrowLeft,
   ArrowRight,
   SignOut,
   WebhooksLogo,

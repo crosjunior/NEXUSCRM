@@ -11,6 +11,9 @@ import type { CredentialRow } from "@/hooks/ai/useCredentials";
 import { lerAmbiente } from "@/lib/instalacao/ambiente";
 import { fusoUtilizavel } from "@/lib/tempo/fusos";
 
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Sparkle, ArrowRight } from "@/lib/ui/icons";
 import { AgentForm } from "../[id]/_components/AgentForm";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +64,29 @@ export default async function NewAgentPage() {
 
   return (
     <div className="flex h-full flex-col gap-6 p-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-xl border border-emerald-500/40 bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-400">
+            <Sparkle size={20} aria-hidden />
+          </div>
+          <div>
+            <div className="text-sm font-semibold text-foreground">
+              Prefere criar com o Assistente Inteligente de IA?
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Passo a passo conversacional simples e rápido, com parametrização automática baseada nos materiais da sua empresa.
+            </p>
+          </div>
+        </div>
+        <Link href="/app/ai/agents/wizard" className="shrink-0">
+          <Button className="gap-2 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white shadow-sm">
+            <Sparkle size={14} aria-hidden />
+            Usar Assistente de IA
+            <ArrowRight size={14} aria-hidden />
+          </Button>
+        </Link>
+      </div>
+
       <AgentForm
         mode="create"
         credentials={credentials}
