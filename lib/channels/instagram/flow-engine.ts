@@ -558,7 +558,7 @@ export function buildManyChatDefaultGraph(opts?: {
     { x: 700, y: 210 },
     {
       text: "Aqui está! Qualquer dúvida é só responder por aqui.",
-      buttons: [{ id: uid("b"), title: "Acessar", type: "url", url: "https://seusite.com.br" }],
+      buttons: [{ id: uid("b"), title: "Acessar", type: "url", url: "https://x.example.com" }],
       quickReplies: [],
     },
   );

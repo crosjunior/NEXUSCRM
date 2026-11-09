@@ -8,6 +8,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { ok, fail } from "@/lib/api/wrappers";
 import { requireRole } from "@/lib/auth/require-role";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { extrairConfiguracaoAutonoma } from "@/lib/onboarding/autonomous-extractor";
 import type { AutonomousExtractionInput } from "@/lib/onboarding/autonomous-types";
 
@@ -38,6 +39,9 @@ export async function POST(req: NextRequest) {
   // Autorização canônica: apenas admin da organização
   const authz = await requireRole("admin", { requestId, resource: "onboarding.autonomous" });
   if (!authz.ok) return authz.response;
+
+  const supportBlock = await requireSupportWrite(authz.org.orgId);
+  if (supportBlock) return supportBlock;
 
   let body: unknown;
   try {

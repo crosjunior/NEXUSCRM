@@ -962,6 +962,26 @@ const HOSTS_DECLARADOS: Record<string, EntradaDeHost> = {
     motivo:
       "endpoint da Graph API do WhatsApp Cloud — 6 arquivos: envio de template, sincronização de modelos, validação de credencial, conversões e insights. É contrato da Meta, não escolha nossa.",
   },
+  "www.facebook.com": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "endpoint de diálogo OAuth do Facebook Login for Business usado pela conexão direta com Instagram (`lib/channels/instagram/api.ts`). É o destino de redirecionamento exigido pela Meta.",
+  },
+  "api.instagram.com": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "endpoint de autorização e troca de token OAuth da API oficial do Instagram (`lib/channels/instagram/api.ts`). É o destino do request exigido pela Meta.",
+  },
+  "graph.instagram.com": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "endpoint da Graph API do Instagram para leitura de perfil, mídias e envio de DMs/respostas a comentários (`lib/channels/instagram/api.ts`). É contrato da Meta.",
+  },
+  "www.instagram.com": {
+    categoria: "FORNECEDOR",
+    motivo:
+      "endpoint de autorização OAuth Business Login do Instagram (`lib/channels/instagram/api.ts`). É o destino de redirecionamento exigido pela Meta.",
+  },
   "www.googleapis.com": {
     categoria: "FORNECEDOR",
     motivo:

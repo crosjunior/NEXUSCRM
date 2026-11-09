@@ -14,6 +14,7 @@ import { fusoUtilizavel } from "@/lib/tempo/fusos";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sparkle, ArrowRight } from "@/lib/ui/icons";
+import { getT } from "@/lib/i18n/server";
 import { AgentForm } from "../[id]/_components/AgentForm";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,7 @@ function provedoresDaInstalacao(): string[] {
 }
 
 export default async function NewAgentPage() {
+  const t = await getT();
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
@@ -71,17 +73,17 @@ export default async function NewAgentPage() {
           </div>
           <div>
             <div className="text-sm font-semibold text-foreground">
-              Prefere criar com o Assistente Inteligente de IA?
+              {t("Prefere criar com o Assistente Inteligente de IA?")}
             </div>
             <p className="text-xs text-muted-foreground">
-              Passo a passo conversacional simples e rápido, com parametrização automática baseada nos materiais da sua empresa.
+              {t("Passo a passo conversacional simples e rápido, com parametrização automática baseada nos materiais da sua empresa.")}
             </p>
           </div>
         </div>
         <Link href="/app/ai/agents/wizard" className="shrink-0">
           <Button className="gap-2 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white shadow-sm">
             <Sparkle size={14} aria-hidden />
-            Usar Assistente de IA
+            {t("Usar Assistente de IA")}
             <ArrowRight size={14} aria-hidden />
           </Button>
         </Link>

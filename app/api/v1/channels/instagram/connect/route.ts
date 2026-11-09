@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { loadAuthUser, resolveActiveOrg } from "@/lib/auth/server";
+import { loadAuthUser } from "@/lib/auth/server";
+import { orgAtivaDaApi } from "@/lib/auth/require-role";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { env } from "@/lib/env";
 import { resolveInstagramCreds } from "@/lib/channels/instagram/credentials";
@@ -13,7 +14,11 @@ export async function GET() {
     return NextResponse.redirect(`${env.NEXT_PUBLIC_APP_URL}/login`);
   }
 
-  const org = await resolveActiveOrg(user);
+  const orgCheck = await orgAtivaDaApi(user);
+  if (!orgCheck.ok) {
+    return orgCheck.response;
+  }
+  const org = orgCheck.org;
   if (!org) {
     return NextResponse.redirect(`${env.NEXT_PUBLIC_APP_URL}/app`);
   }
@@ -22,7 +27,7 @@ export async function GET() {
   const db = createAdminClient();
   const creds = await resolveInstagramCreds(db, orgId);
 
-  const appUrl = (env.NEXT_PUBLIC_APP_URL || "https://crm.nexusia.work").replace(/\/$/, "");
+  const appUrl = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
   const redirectUri = `${appUrl}/api/v1/channels/instagram/callback`;
   const state = Buffer.from(
     JSON.stringify({ org: orgId, uid: user.id, ts: Date.now() }),

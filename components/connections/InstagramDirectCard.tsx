@@ -11,7 +11,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api/client";
+import { copyToClipboard as copyTextToClipboard } from "@/lib/clipboard";
 import { useT } from "@/hooks/i18n/useT";
+import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import {
   buildManyChatDefaultGraph,
   extractRuleSummaryFromGraph,
@@ -50,10 +52,10 @@ interface InstagramState {
   webhook_verify_token: string;
 }
 
-function formatMediaDate(iso: string): string {
+function formatMediaDate(iso: string, tagIdioma: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("pt-BR", {
+  return d.toLocaleString(tagIdioma, {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -76,7 +78,7 @@ function mediaTypeBadgeLabel(productType?: string | null): string {
   return "POST";
 }
 
-function getRuleScheduleStatus(rule: InstagramKeywordRule): {
+function getRuleScheduleStatus(rule: InstagramKeywordRule, tagIdioma: string): {
   label: string;
   tone: "emerald" | "amber" | "red" | "muted";
 } {
@@ -90,21 +92,22 @@ function getRuleScheduleStatus(rule: InstagramKeywordRule): {
   if (rule.starts_at) {
     const startMs = Date.parse(rule.starts_at);
     if (!Number.isNaN(startMs) && now < startMs) {
-      return { label: `Agendada (inicia ${formatMediaDate(rule.starts_at)})`, tone: "amber" };
+      return { label: `Agendada (inicia ${formatMediaDate(rule.starts_at, tagIdioma)})`, tone: "amber" };
     }
   }
   if (rule.ends_at) {
     const endMs = Date.parse(rule.ends_at);
     if (!Number.isNaN(endMs) && now > endMs) {
-      return { label: `Encerrada em ${formatMediaDate(rule.ends_at)}`, tone: "red" };
+      return { label: `Encerrada em ${formatMediaDate(rule.ends_at, tagIdioma)}`, tone: "red" };
     }
-    return { label: `Ativa até ${formatMediaDate(rule.ends_at)}`, tone: "emerald" };
+    return { label: `Ativa até ${formatMediaDate(rule.ends_at, tagIdioma)}`, tone: "emerald" };
   }
   return { label: "Temporária (em vigor)", tone: "emerald" };
 }
 
 export function InstagramDirectCard() {
   const t = useT();
+  const tagIdioma = useTagDeIdioma();
   const queryClient = useQueryClient();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -446,7 +449,7 @@ export function InstagramDirectCard() {
   }
 
   function copyToClipboard(text: string, label: string) {
-    navigator.clipboard.writeText(text);
+    void copyTextToClipboard(text);
     toast.success(`${label} copiado para a área de transferência!`);
   }
 
@@ -493,7 +496,6 @@ export function InstagramDirectCard() {
             <svg
               className="h-6 w-6 fill-current"
               viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
             >
               <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
             </svg>
@@ -778,7 +780,7 @@ export function InstagramDirectCard() {
                             </div>
                             {selectedMediaObj.timestamp && (
                               <span className="text-[11px] text-muted-foreground">
-                                Publicado em {formatMediaDate(selectedMediaObj.timestamp)}
+                                {t("Publicado em")} {formatMediaDate(selectedMediaObj.timestamp, tagIdioma)}
                               </span>
                             )}
                           </div>
@@ -799,7 +801,7 @@ export function InstagramDirectCard() {
                         </div>
                       )}
                       <span className="text-xs text-muted-foreground shrink-0">
-                        {isMediaDropdownOpen ? "▲ Fechar" : "▼ Selecionar"}
+                        {isMediaDropdownOpen ? t("▲ Fechar") : t("▼ Selecionar")}
                       </span>
                     </button>
 
@@ -810,25 +812,24 @@ export function InstagramDirectCard() {
                             {t("Ordenado do mais novo para o mais antigo")} ({filteredMediaItems.length})
                           </span>
                           <div className="flex items-center gap-1">
-                            {(
-                              [
-                                { key: "ALL", label: "Todos" },
-                                { key: "FEED", label: "Posts" },
-                                { key: "REELS", label: "Reels" },
-                                { key: "STORY", label: "Stories" },
-                              ] as const
-                            ).map((tab) => (
+                            {(["ALL", "FEED", "REELS", "STORY"] as const).map((tabKey) => (
                               <button
-                                key={tab.key}
+                                key={tabKey}
                                 type="button"
-                                onClick={() => setMediaFilterType(tab.key)}
-                                className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-                                  mediaFilterType === tab.key
+                                onClick={() => setMediaFilterType(tabKey)}
+                                className={`rounded-md px-2 py-0.5 text-xs font-medium transition-colors ${
+                                  mediaFilterType === tabKey
                                     ? "bg-primary text-primary-foreground"
                                     : "bg-muted text-muted-foreground hover:bg-muted/80"
                                 }`}
                               >
-                                {tab.label}
+                                {tabKey === "ALL"
+                                  ? t("Todos")
+                                  : tabKey === "FEED"
+                                  ? t("Posts")
+                                  : tabKey === "REELS"
+                                  ? t("Reels")
+                                  : t("Stories")}
                               </button>
                             ))}
                           </div>
@@ -894,7 +895,7 @@ export function InstagramDirectCard() {
                                     </span>
                                   </div>
                                   <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                                    <span>{formatMediaDate(item.timestamp)}</span>
+                                    <span>{formatMediaDate(item.timestamp, tagIdioma)}</span>
                                     <span>· ID: {item.id.slice(-6)}</span>
                                   </div>
                                 </div>
@@ -990,7 +991,7 @@ export function InstagramDirectCard() {
                         onChange={(e) =>
                           setRuleForm((r) => ({ ...r, public_reply: e.target.value }))
                         }
-                        placeholder="Te enviei no direct! Dá uma olhada 🚀"
+                        placeholder={t("Te enviei no direct! Dá uma olhada 🚀")}
                       />
                       <p className="text-xs text-muted-foreground">
                         {t("A resposta que fica visível para todos abaixo do comentário do seguidor.")}
@@ -1005,7 +1006,7 @@ export function InstagramDirectCard() {
                       rows={3}
                       value={ruleForm.dm_message}
                       onChange={(e) => setRuleForm((r) => ({ ...r, dm_message: e.target.value }))}
-                      placeholder="Olá {username}! Aqui está o link que você pediu: https://nexusia.work/oferta"
+                      placeholder={t("Olá {username}! Aqui está o link que você pediu: https://x.example.com/oferta")}
                     />
                     <p className="text-xs text-muted-foreground">
                       {t("Use {username} ou {{first_name}} para personalizar com o nome do seguidor.")}
@@ -1061,7 +1062,7 @@ export function InstagramDirectCard() {
                   matchedMedia?.caption_preview || rule.media_caption_preview || null;
                 const prodType =
                   matchedMedia?.media_product_type || rule.media_product_type || "FEED";
-                const sched = getRuleScheduleStatus(rule);
+                const sched = getRuleScheduleStatus(rule, tagIdioma);
 
                 const ruleLogs = allExecutions.filter((e) => e.rule_id === rule.id);
                 const totalTriggers = Math.max(
@@ -1102,7 +1103,7 @@ export function InstagramDirectCard() {
                         )
                       ) : (
                         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-primary/20 bg-primary/5 text-[10px] font-bold text-primary">
-                          TODOS
+                          {t("TODOS")}
                         </div>
                       )}
 
@@ -1119,7 +1120,7 @@ export function InstagramDirectCard() {
                                 : ""
                             }`}
                           >
-                            {rule.mode === "visual" ? "⚡ Fluxo Visual" : "Básica"}
+                            {rule.mode === "visual" ? t("⚡ Fluxo Visual") : t("Básica")}
                           </Badge>
                           <Badge variant="secondary" className="text-[11px] font-normal">
                             {rule.type === "comment_keyword"
@@ -1143,7 +1144,7 @@ export function InstagramDirectCard() {
                             {sched.label}
                           </Badge>
                           {rule.keywords.length > 0 && (
-                            <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                            <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded-md">
                               {rule.keywords.join(", ")}
                             </span>
                           )}
@@ -1165,7 +1166,7 @@ export function InstagramDirectCard() {
 
                         {rule.public_reply && (
                           <p className="text-xs text-muted-foreground line-clamp-1">
-                            💬 Comentário: {rule.public_reply}
+                            {t("💬 Comentário:")} {rule.public_reply}
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground line-clamp-1">
@@ -1176,15 +1177,15 @@ export function InstagramDirectCard() {
                         <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-muted-foreground">
                           <span className="inline-flex items-center gap-1">
                             <MessageCircle className="h-3 w-3 text-primary" />
-                            <strong className="text-foreground">{totalTriggers}</strong> acionamentos
+                            <strong className="text-foreground">{totalTriggers}</strong> {t("acionamentos")}
                           </span>
                           <span className="inline-flex items-center gap-1">
                             <Send className="h-3 w-3 text-indigo-500" />
-                            <strong className="text-foreground">{totalReplies}</strong> respostas
+                            <strong className="text-foreground">{totalReplies}</strong> {t("respostas")}
                           </span>
                           <span className="inline-flex items-center gap-1">
                             <Users className="h-3 w-3 text-emerald-500" />
-                            <strong className="text-foreground">{totalFollowers}</strong> seguidores
+                            <strong className="text-foreground">{totalFollowers}</strong> {t("seguidores")}
                           </span>
                         </div>
                       </div>

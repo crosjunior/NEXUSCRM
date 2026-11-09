@@ -30,7 +30,107 @@ import type {
 } from "./types";
 import { ingestZernioInbound } from "../zernio/ingest";
 import type { SocialMessage } from "../social/parser";
-import { socialMessageId } from "../social/catalog";
+import { SOCIAL_PROVIDER, socialMessageId } from "../social/catalog";
+
+export interface InstagramChannelSessionRecord {
+  id: string;
+  display_name: string | null;
+  status: string;
+  accountId: string;
+  meta_token_encrypted: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getInstagramChannelSession(
+  db: SupabaseClient,
+  orgId: string,
+): Promise<InstagramChannelSessionRecord | null> {
+  const { data: session } = await db
+    .from("channel_sessions")
+    .select(
+      "id, display_name, status, zernio_account_id, meta_token_encrypted, metadata, created_at, updated_at",
+    )
+    .eq("organization_id", orgId)
+    .eq("provider", SOCIAL_PROVIDER)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (!session) return null;
+  const meta = (session.metadata ?? {}) as Record<string, unknown>;
+  return {
+    id: session.id as string,
+    display_name: (session.display_name as string | null) ?? null,
+    status: (session.status as string) ?? "WORKING",
+    accountId: (session.zernio_account_id as string) || String(meta.ig_user_id || ""),
+    meta_token_encrypted: (session.meta_token_encrypted as string | null) ?? null,
+    metadata: meta,
+    created_at: session.created_at as string,
+    updated_at: session.updated_at as string,
+  };
+}
+
+export async function upsertInstagramChannelSession(
+  db: SupabaseClient,
+  params: {
+    orgId: string;
+    userId: string;
+    accountId: string;
+    username: string;
+    encryptedToken: string;
+    metadata: Record<string, unknown>;
+  },
+): Promise<{ id: string }> {
+  const { data: existing } = await db
+    .from("channel_sessions")
+    .select("id, metadata")
+    .eq("organization_id", params.orgId)
+    .eq("provider", SOCIAL_PROVIDER)
+    .eq("zernio_account_id", params.accountId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  const prevMetadata = (existing?.metadata ?? {}) as Record<string, unknown>;
+  const updatedMetadata = {
+    ...prevMetadata,
+    ...params.metadata,
+  };
+
+  if (existing) {
+    await db
+      .from("channel_sessions")
+      .update({
+        display_name: `Instagram · @${params.username}`,
+        status: "WORKING",
+        meta_token_encrypted: params.encryptedToken,
+        metadata: updatedMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
+      .eq("organization_id", params.orgId);
+    return { id: existing.id as string };
+  }
+
+  const { data: inserted } = await db
+    .from("channel_sessions")
+    .insert({
+      organization_id: params.orgId,
+      provider: SOCIAL_PROVIDER,
+      waha_session_name: `ig_direct_${params.orgId.slice(0, 8)}_${params.accountId.slice(-6)}`,
+      webhook_secret_encrypted: params.encryptedToken,
+      zernio_account_id: params.accountId,
+      display_name: `Instagram · @${params.username}`,
+      status: "WORKING",
+      meta_token_encrypted: params.encryptedToken,
+      metadata: updatedMetadata,
+      created_by: params.userId,
+    })
+    .select("id")
+    .single();
+
+  return { id: (inserted?.id as string) ?? "" };
+}
 
 interface ChannelSessionMetadata {
   platform?: string;
@@ -196,12 +296,16 @@ export async function processInstagramWebhookEvent(
   if (event.kind === "ignored") return { status: "ignored", reason: "evento_ignorado" };
 
   // Busca a sessão do canal correspondente à conta do Instagram
-  const { data: session, error } = await db
+  const { data: candidates, error } = await db
     .from("channel_sessions")
-    .select("id, organization_id, meta_token_encrypted, metadata, status")
-    .eq("zernio_account_id", event.igUserId)
-    .is("archived_at", null)
-    .maybeSingle();
+    .select("id, organization_id, zernio_account_id, meta_token_encrypted, metadata, status")
+    .eq("provider", SOCIAL_PROVIDER)
+    .is("archived_at", null);
+
+  const session = (candidates ?? []).find((row) => {
+    const meta = (row.metadata ?? {}) as Record<string, unknown>;
+    return row.zernio_account_id === event.igUserId || String(meta.ig_user_id || "") === event.igUserId;
+  });
 
   if (error || !session) {
     logger.info("[instagram.webhook] Nenhuma sessão ativa encontrada para conta", {

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { env } from "@/lib/env";
+import { graphVersion } from "@/lib/graph-version";
 import type { InstagramTenantConfig } from "./types";
 
 export interface ResolvedInstagramCreds {
@@ -14,7 +14,6 @@ export const DEFAULT_INSTAGRAM_APP_ID = "1002166082905050";
 export const DEFAULT_INSTAGRAM_APP_SECRET = "6f8784f833a90c68e49741a56a3dd047";
 export const DEFAULT_INSTAGRAM_CONFIG_ID = "1660645855857528";
 export const DEFAULT_INSTAGRAM_VERIFY_TOKEN = "13c41bf757eece8583d880d5848c1cbc";
-export const DEFAULT_INSTAGRAM_GRAPH_VERSION = "v24.0";
 
 /**
  * Resolve as credenciais da Meta para a organização (multi-tenant).
@@ -46,32 +45,32 @@ export async function resolveInstagramCreds(
 
   const appId =
     tenantCustom?.app_id?.trim() ||
-    env.INSTAGRAM_APP_ID?.trim() ||
+    process.env.INSTAGRAM_APP_ID?.trim() ||
     DEFAULT_INSTAGRAM_APP_ID;
 
   const appSecret =
     tenantCustom?.app_secret?.trim() ||
-    env.INSTAGRAM_APP_SECRET?.trim() ||
+    process.env.INSTAGRAM_APP_SECRET?.trim() ||
     DEFAULT_INSTAGRAM_APP_SECRET;
 
   const configId =
     tenantCustom?.config_id?.trim() ||
-    env.INSTAGRAM_CONFIG_ID?.trim() ||
+    process.env.INSTAGRAM_CONFIG_ID?.trim() ||
     DEFAULT_INSTAGRAM_CONFIG_ID;
 
   const verifyToken =
     tenantCustom?.verify_token?.trim() ||
-    env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN?.trim() ||
+    process.env.INSTAGRAM_WEBHOOK_VERIFY_TOKEN?.trim() ||
     DEFAULT_INSTAGRAM_VERIFY_TOKEN;
 
-  const graphVersion =
-    env.INSTAGRAM_GRAPH_VERSION?.trim() || DEFAULT_INSTAGRAM_GRAPH_VERSION;
+  const resolvedGraphVersion =
+    process.env.INSTAGRAM_GRAPH_VERSION?.trim() || graphVersion();
 
   return {
     appId,
     appSecret,
     configId,
     verifyToken,
-    graphVersion,
+    graphVersion: resolvedGraphVersion,
   };
 }

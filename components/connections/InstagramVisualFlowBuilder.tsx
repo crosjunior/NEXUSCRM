@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { useT } from "@/hooks/i18n/useT";
 import {
   advanceFlow,
   createFlowState,
@@ -247,6 +248,7 @@ export function InstagramVisualFlowBuilder({
   onChange,
   mediaItems,
 }: InstagramVisualFlowBuilderProps) {
+  const t = useT();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
     graph.nodes[0]?.id ?? null,
   );
@@ -379,7 +381,17 @@ export function InstagramVisualFlowBuilder({
                 <span className={`inline-flex rounded-md p-1 ${p.badgeColor}`}>
                   <Icon className="h-3 w-3" />
                 </span>
-                {p.label}
+                {p.type === "message"
+                  ? t("Mensagem")
+                  : p.type === "input"
+                    ? t("Pergunta")
+                    : p.type === "condition"
+                      ? t("Condição")
+                      : p.type === "action"
+                        ? t("Ação")
+                        : p.type === "delay"
+                          ? t("Espera")
+                          : t("IA")}
               </button>
             );
           })}
@@ -393,7 +405,7 @@ export function InstagramVisualFlowBuilder({
               className="flex items-center gap-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
             >
               <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-              {issues.length} {issues.length === 1 ? "aviso" : "avisos"}
+              {issues.length} {issues.length === 1 ? t("aviso") : t("avisos")}
             </button>
           )}
           <button
@@ -406,7 +418,7 @@ export function InstagramVisualFlowBuilder({
             }`}
           >
             <FlaskConical className="h-3.5 w-3.5" />
-            Testar Fluxo
+            {t("Testar Fluxo")}
           </button>
         </div>
       </div>
@@ -415,13 +427,13 @@ export function InstagramVisualFlowBuilder({
       {showIssues && issues.length > 0 && (
         <div className="border-b border-amber-200 bg-amber-50/90 px-4 py-2 text-xs">
           <div className="flex items-center justify-between pb-1 font-semibold text-amber-900">
-            <span>Verificações do fluxo</span>
+            <span>{t("Verificações do fluxo")}</span>
             <button
               type="button"
               onClick={() => setShowIssues(false)}
               className="text-amber-700 hover:underline"
             >
-              Fechar
+              {t("Fechar")}
             </button>
           </div>
           <ul className="space-y-1">
@@ -442,14 +454,14 @@ export function InstagramVisualFlowBuilder({
       {connectingFrom && (
         <div className="flex items-center justify-between bg-indigo-600 px-4 py-1.5 text-xs font-medium text-white">
           <span>
-            🔗 Clique em qualquer bloco no quadro para conectar a saída selecionada, ou escolha pelo painel lateral.
+            {t("🔗 Clique em qualquer bloco no quadro para conectar a saída selecionada, ou escolha pelo painel lateral.")}
           </span>
           <button
             type="button"
             onClick={() => setConnectingFrom(null)}
-            className="rounded bg-white/20 px-2 py-0.5 text-[11px] hover:bg-white/30"
+            className="rounded-md bg-white/20 px-2 py-0.5 text-[11px] hover:bg-white/30"
           >
-            Cancelar conexão
+            {t("Cancelar conexão")}
           </button>
         </div>
       )}
@@ -550,7 +562,7 @@ export function InstagramVisualFlowBuilder({
                   {/* Ponto de entrada (Target Handle) para todos os nós exceto start */}
                   {node.type !== "start" && (
                     <span
-                      title="Entrada do passo"
+                      title={t("Entrada do passo")}
                       style={{ top: 82 }}
                       className="absolute -left-1.5 h-3 w-3 -translate-y-1/2 rounded-full border-2 border-white bg-zinc-400 shadow-xs"
                     />
@@ -594,7 +606,7 @@ export function InstagramVisualFlowBuilder({
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center p-6 text-center text-xs text-zinc-500">
-              Clique em qualquer bloco no quadro ao lado para editar suas configurações e conexões.
+              {t("Clique em qualquer bloco no quadro ao lado para editar suas configurações e conexões.")}
             </div>
           )}
         </div>
@@ -621,6 +633,7 @@ function NodeCardBody({
   connectingFrom: { nodeId: string; handleId: string } | null;
   onStartConnect: (handleId: string) => void;
 }) {
+  const t = useT();
   const headerConfig: Record<
     FlowNodeType,
     { title: string; icon: typeof Play; badge: string }
@@ -652,16 +665,16 @@ function NodeCardBody({
         {node.type === "start" && (
           <div className="space-y-1.5">
             {((node.data as FlowStartData).triggers ?? []).length === 0 ? (
-              <p className="text-zinc-400">Clique para configurar o gatilho</p>
+              <p className="text-zinc-400">{t("Clique para configurar o gatilho")}</p>
             ) : (
-              ((node.data as FlowStartData).triggers ?? []).map((t) => (
+              ((node.data as FlowStartData).triggers ?? []).map((trig) => (
                 <div
-                  key={t.id}
+                  key={trig.id}
                   className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-[11px] text-emerald-900"
                 >
-                  <div className="font-semibold">{TRIGGER_LABELS[t.type]}</div>
-                  {t.keywords?.length > 0 && (
-                    <div className="truncate text-emerald-700">{t.keywords.join(", ")}</div>
+                  <div className="font-semibold">{t(TRIGGER_LABELS[trig.type])}</div>
+                  {trig.keywords?.length > 0 && (
+                    <div className="truncate text-emerald-700">{trig.keywords.join(", ")}</div>
                   )}
                 </div>
               ))
@@ -672,13 +685,13 @@ function NodeCardBody({
         {node.type === "message" && (
           <div className="space-y-1.5">
             {(node.data as FlowMessageData).imageUrl && (
-              <div className="truncate rounded bg-zinc-100 px-2 py-1 text-[10px] text-zinc-500">
+              <div className="truncate rounded-md bg-zinc-100 px-2 py-1 text-[10px] text-zinc-500">
                 🖼️ {(node.data as FlowMessageData).imageUrl}
               </div>
             )}
             <p className="line-clamp-3 whitespace-pre-wrap text-zinc-700">
               {(node.data as FlowMessageData).text || (
-                <span className="text-zinc-400">Mensagem vazia…</span>
+                <span className="text-zinc-400">{t("Mensagem vazia…")}</span>
               )}
             </p>
             {((node.data as FlowMessageData).buttons ?? [])
@@ -688,7 +701,7 @@ function NodeCardBody({
                   key={b.id}
                   className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-1.5 text-[11px] text-zinc-600"
                 >
-                  <span className="truncate">{b.title || "(sem título)"}</span>
+                  <span className="truncate">{b.title || t("(sem título)")}</span>
                   <ExternalLink className="h-3 w-3 shrink-0 text-zinc-400" />
                 </div>
               ))}
@@ -698,11 +711,11 @@ function NodeCardBody({
         {node.type === "input" && (
           <div className="space-y-1">
             <p className="line-clamp-2 text-zinc-700">
-              {(node.data as FlowInputData).question || "Pergunta…"}
+              {(node.data as FlowInputData).question || t("Pergunta…")}
             </p>
             <div className="text-[11px] text-zinc-400">
-              Salvar em{" "}
-              <code className="rounded bg-zinc-100 px-1 text-zinc-700">
+              {t("Salvar em")}{" "}
+              <code className="rounded-md bg-zinc-100 px-1 text-zinc-700">
                 {(node.data as FlowInputData).field || "?"}
               </code>{" "}
               ({(node.data as FlowInputData).validation})
@@ -712,8 +725,8 @@ function NodeCardBody({
 
         {node.type === "condition" && (
           <div className="rounded-lg bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900">
-            Se contato{" "}
-            <b>{COND_LABELS[(node.data as FlowConditionData).op] ?? "cumpre condição"}</b>{" "}
+            {t("Se contato")}{" "}
+            <b>{t(COND_LABELS[(node.data as FlowConditionData).op])}</b>{" "}
             <code className="font-mono">
               {(node.data as FlowConditionData).op === "is_follower" ||
               (node.data as FlowConditionData).op === "not_follower"
@@ -730,11 +743,11 @@ function NodeCardBody({
         {node.type === "action" && (
           <div className="space-y-1">
             {((node.data as FlowActionData).actions ?? []).length === 0 ? (
-              <p className="text-zinc-400">Nenhuma ação configurada</p>
+              <p className="text-zinc-400">{t("Nenhuma ação configurada")}</p>
             ) : (
               ((node.data as FlowActionData).actions ?? []).map((a) => (
                 <div key={a.id} className="truncate text-[11px] text-zinc-700">
-                  • {ACTION_LABELS[a.kind]}{" "}
+                  • {t(ACTION_LABELS[a.kind])}{" "}
                   <span className="font-medium text-zinc-900">
                     {a.tag ?? a.field ?? a.url ?? ""}
                   </span>
@@ -746,19 +759,19 @@ function NodeCardBody({
 
         {node.type === "delay" && (
           <p className="text-zinc-700">
-            Aguardar <b>{(node.data as FlowDelayData).minutes} min</b>
+            {t("Aguardar")} <b>{(node.data as FlowDelayData).minutes} min</b>
           </p>
         )}
 
         {node.type === "ai" && (
           <div className="space-y-1">
             <p className="line-clamp-2 text-zinc-700">
-              {(node.data as FlowAiData).systemPrompt || "Instruções da IA…"}
+              {(node.data as FlowAiData).systemPrompt || t("Instruções da IA…")}
             </p>
             <div className="text-[11px] text-violet-700">
               {(node.data as FlowAiData).conversational
-                ? `Conversa até ${(node.data as FlowAiData).maxTurns} turnos`
-                : "Resposta única"}
+                ? `${t("Conversa até")} ${(node.data as FlowAiData).maxTurns} ${t("turnos")}`
+                : t("Resposta única")}
             </div>
           </div>
         )}
@@ -792,7 +805,7 @@ function NodeCardBody({
                   e.stopPropagation();
                   onStartConnect(h.id);
                 }}
-                title="Clique para conectar a outro passo"
+                title={t("Clique para conectar a outro passo")}
                 className={`relative flex items-center justify-between rounded-lg border px-2.5 py-1.5 text-[11px] cursor-pointer transition hover:brightness-95 ${boxClasses} ${
                   isConnectingThis ? "ring-2 ring-indigo-500" : ""
                 }`}
@@ -841,6 +854,7 @@ function VisualNodeSideEditor({
   onConnectHandle: (handleId: string, targetId: string) => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   const titles: Record<FlowNodeType, string> = {
     start: "Gatilhos de entrada (Início)",
     message: "Enviar mensagem",
@@ -865,7 +879,7 @@ function VisualNodeSideEditor({
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50"
           >
             <Trash2 className="h-3.5 w-3.5" />
-            Excluir passo
+            {t("Excluir passo")}
           </button>
         )}
       </div>
@@ -918,7 +932,7 @@ function VisualNodeSideEditor({
         {/* Seletor de Conexões de Saída (Próximo Passo) */}
         <div className="space-y-2 border-t border-zinc-200 pt-4">
           <Label className="text-xs font-semibold text-zinc-700">
-            🔗 Conexões de saída deste bloco
+            {t("🔗 Conexões de saída deste bloco")}
           </Label>
           {handles.map((h) => {
             const currentEdge = edges.find(
@@ -927,14 +941,14 @@ function VisualNodeSideEditor({
             return (
               <div key={h.id} className="space-y-1 rounded-lg border border-zinc-200 bg-zinc-50 p-2">
                 <span className="block text-[11px] font-medium text-zinc-600">
-                  Saída: <b>{h.label}</b>
+                  {t("Saída:")} <b>{h.label}</b>
                 </span>
                 <select
                   className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs text-zinc-800"
                   value={currentEdge?.target ?? ""}
                   onChange={(e) => onConnectHandle(h.id, e.target.value)}
                 >
-                  <option value="">— Fim do fluxo (desconectado) —</option>
+                  <option value="">{t("— Fim do fluxo (desconectado) —")}</option>
                   {availableTargets.map((tNode) => {
                     const preview =
                       tNode.type === "message"
@@ -976,35 +990,36 @@ function StartNodeForm({
   mediaItems: InstagramMediaItem[];
   onChange: (d: FlowStartData) => void;
 }) {
+  const t = useT();
   const updateTrig = (idx: number, patch: Partial<FlowTriggerConfig>) => {
     onChange({
-      triggers: data.triggers.map((t, i) => (i === idx ? { ...t, ...patch } : t)),
+      triggers: data.triggers.map((trig, i) => (i === idx ? { ...trig, ...patch } : trig)),
     });
   };
 
   return (
     <div className="space-y-3">
       <p className="text-[11px] text-zinc-500">
-        O fluxo dispara quando qualquer um dos gatilhos abaixo acontecer no Instagram.
+        {t("O fluxo dispara quando qualquer um dos gatilhos abaixo acontecer no Instagram.")}
       </p>
-      {data.triggers.map((t, idx) => (
+      {data.triggers.map((trig, idx) => (
         <div
-          key={t.id}
+          key={trig.id}
           className="space-y-2.5 rounded-xl border border-zinc-200 bg-zinc-50/60 p-3"
         >
           <div className="flex items-center justify-between gap-2">
             <select
               className="flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs font-medium text-zinc-900"
-              value={t.type}
+              value={trig.type}
               onChange={(e) =>
                 updateTrig(idx, { type: e.target.value as FlowTriggerConfig["type"] })
               }
             >
-              <option value="comment_keyword">Comentário em Post/Reels</option>
-              <option value="dm_keyword">Mensagem no Direct (DM)</option>
-              <option value="story_reply">Resposta ao Story</option>
-              <option value="story_mention">Menção em Story (@sua_conta)</option>
-              <option value="default_reply">Qualquer DM (resposta padrão)</option>
+              <option value="comment_keyword">{t("Comentário em Post/Reels")}</option>
+              <option value="dm_keyword">{t("Mensagem no Direct (DM)")}</option>
+              <option value="story_reply">{t("Resposta ao Story")}</option>
+              <option value="story_mention">{t("Menção em Story (@sua_conta)")}</option>
+              <option value="default_reply">{t("Qualquer DM (resposta padrão)")}</option>
             </select>
             {data.triggers.length > 1 && (
               <button
@@ -1019,59 +1034,59 @@ function StartNodeForm({
             )}
           </div>
 
-          {(t.type === "comment_keyword" ||
-            t.type === "dm_keyword" ||
-            t.type === "story_reply") && (
+          {(trig.type === "comment_keyword" ||
+            trig.type === "dm_keyword" ||
+            trig.type === "story_reply") && (
             <>
               <div>
-                <Label className="text-[11px] text-zinc-600">Correspondência</Label>
+                <Label className="text-[11px] text-zinc-600">{t("Correspondência")}</Label>
                 <select
                   className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs"
-                  value={t.match}
+                  value={trig.match}
                   onChange={(e) =>
                     updateTrig(idx, {
                       match: e.target.value as FlowTriggerConfig["match"],
                     })
                   }
                 >
-                  <option value="contains">Contém a palavra</option>
-                  <option value="exact">Igual à palavra</option>
-                  <option value="any">Qualquer texto</option>
+                  <option value="contains">{t("Contém a palavra")}</option>
+                  <option value="exact">{t("Igual à palavra")}</option>
+                  <option value="any">{t("Qualquer texto")}</option>
                 </select>
               </div>
 
-              {t.match !== "any" && (
+              {trig.match !== "any" && (
                 <div>
                   <Label className="text-[11px] text-zinc-600">
-                    Palavras-chave (separadas por vírgula)
+                    {t("Palavras-chave (separadas por vírgula)")}
                   </Label>
                   <Input
                     className="mt-1 h-8 bg-white text-xs text-zinc-900"
-                    value={t.keywords.join(", ")}
+                    value={trig.keywords.join(", ")}
                     onChange={(e) =>
                       updateTrig(idx, {
                         keywords: e.target.value.split(",").map((s) => s.trim()),
                       })
                     }
-                    placeholder="quero, link, eu quero"
+                    placeholder={t("quero, link, eu quero")}
                   />
                 </div>
               )}
             </>
           )}
 
-          {t.type === "comment_keyword" && (
+          {trig.type === "comment_keyword" && (
             <>
               <div>
                 <Label className="text-[11px] text-zinc-600">
-                  Publicação alvo (Post ou Reels)
+                  {t("Publicação alvo (Post ou Reels)")}
                 </Label>
                 <select
                   className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs"
-                  value={t.mediaId ?? ""}
+                  value={trig.mediaId ?? ""}
                   onChange={(e) => updateTrig(idx, { mediaId: e.target.value || null })}
                 >
-                  <option value="">Qualquer post ou reel da conta</option>
+                  <option value="">{t("Qualquer post ou reel da conta")}</option>
                   {mediaItems.map((m) => (
                     <option key={m.id} value={m.id}>
                       [{m.media_product_type}] {m.caption_preview}
@@ -1082,16 +1097,16 @@ function StartNodeForm({
 
               <div>
                 <Label className="text-[11px] text-zinc-600">
-                  Respostas públicas no comentário (1 por linha — sorteia)
+                  {t("Respostas públicas no comentário (1 por linha — sorteia)")}
                 </Label>
                 <Textarea
                   rows={2}
                   className="mt-1 bg-white text-xs text-zinc-900"
-                  value={(t.publicReplies ?? []).join("\n")}
+                  value={(trig.publicReplies ?? []).join("\n")}
                   onChange={(e) =>
                     updateTrig(idx, { publicReplies: e.target.value.split("\n") })
                   }
-                  placeholder={"Te mandei no direct! 📩\nOlha sua DM 😉"}
+                  placeholder={t("Te mandei no direct! 📩\nOlha sua DM 😉")}
                 />
               </div>
             </>
@@ -1119,7 +1134,7 @@ function StartNodeForm({
           })
         }
       >
-        <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar gatilho
+        <Plus className="mr-1 h-3.5 w-3.5" /> {t("Adicionar gatilho")}
       </Button>
     </div>
   );
@@ -1132,6 +1147,7 @@ function MessageNodeForm({
   data: FlowMessageData;
   onChange: (d: FlowMessageData) => void;
 }) {
+  const t = useT();
   const updBtn = (idx: number, patch: Partial<FlowButtonItem>) =>
     onChange({
       ...data,
@@ -1147,22 +1163,22 @@ function MessageNodeForm({
   return (
     <div className="space-y-3">
       <div>
-        <Label className="text-[11px] text-zinc-600">Texto da mensagem</Label>
+        <Label className="text-[11px] text-zinc-600">{t("Texto da mensagem")}</Label>
         <Textarea
           rows={4}
           className="mt-1 bg-white text-xs text-zinc-900"
           value={data.text}
           onChange={(e) => onChange({ ...data, text: e.target.value })}
-          placeholder="Oi {{first_name}}! 👋 Toque no botão abaixo..."
+          placeholder={t("Oi {{first_name}}! 👋 Toque no botão abaixo...")}
         />
         <p className="mt-1 text-[10px] text-zinc-400">
-          Variáveis: <code>{"{{first_name}}"}</code>, <code>{"{{username}}"}</code>,{" "}
+          {t("Variáveis:")} <code>{"{{first_name}}"}</code>, <code>{"{{username}}"}</code>,{" "}
           <code>{"{{field.email}}"}</code>
         </p>
       </div>
 
       <div>
-        <Label className="text-[11px] text-zinc-600">URL de imagem (opcional, https://)</Label>
+        <Label className="text-[11px] text-zinc-600">{t("URL de imagem (opcional, https://)")}</Label>
         <Input
           className="mt-1 h-8 bg-white text-xs text-zinc-900"
           value={data.imageUrl ?? ""}
@@ -1175,7 +1191,7 @@ function MessageNodeForm({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label className="text-[11px] font-semibold text-zinc-700">
-            Botões ({data.buttons.length}/3)
+            {t("Botões")} ({data.buttons.length}/3)
           </Label>
           {data.buttons.length < 3 && (
             <button
@@ -1191,7 +1207,7 @@ function MessageNodeForm({
               }
               className="text-[11px] font-medium text-indigo-600 hover:underline"
             >
-              + Botão
+              {t("+ Botão")}
             </button>
           )}
         </div>
@@ -1204,7 +1220,7 @@ function MessageNodeForm({
                 maxLength={20}
                 value={b.title}
                 onChange={(e) => updBtn(i, { title: e.target.value })}
-                placeholder="Título (máx 20)"
+                placeholder={t("Título (máx 20)")}
               />
               <button
                 type="button"
@@ -1220,19 +1236,19 @@ function MessageNodeForm({
               </button>
             </div>
             <select
-              className="w-full rounded border border-zinc-300 bg-white px-2 py-1 text-[11px]"
+              className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-[11px]"
               value={b.type}
               onChange={(e) => updBtn(i, { type: e.target.value as "postback" | "url" })}
             >
-              <option value="postback">Continuar fluxo (conecta ao próximo passo)</option>
-              <option value="url">Abrir link externo (URL)</option>
+              <option value="postback">{t("Continuar fluxo (conecta ao próximo passo)")}</option>
+              <option value="url">{t("Abrir link externo (URL)")}</option>
             </select>
             {b.type === "url" && (
               <Input
                 className="h-7 bg-white text-xs text-zinc-900"
                 value={b.url ?? ""}
                 onChange={(e) => updBtn(i, { url: e.target.value })}
-                placeholder="https://seusite.com.br"
+                placeholder="https://x.example.com"
               />
             )}
           </div>
@@ -1243,7 +1259,7 @@ function MessageNodeForm({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label className="text-[11px] font-semibold text-zinc-700">
-            Respostas rápidas ({data.quickReplies.length}/13)
+            {t("Respostas rápidas")} ({data.quickReplies.length}/13)
           </Label>
           {data.quickReplies.length < 13 && (
             <button
@@ -1259,7 +1275,7 @@ function MessageNodeForm({
               }
               className="text-[11px] font-medium text-indigo-600 hover:underline"
             >
-              + Resposta rápida
+              {t("+ Resposta rápida")}
             </button>
           )}
         </div>
@@ -1270,7 +1286,7 @@ function MessageNodeForm({
               maxLength={20}
               value={q.title}
               onChange={(e) => updQr(i, { title: e.target.value })}
-              placeholder="Texto da pílula"
+              placeholder={t("Texto da pílula")}
             />
             <button
               type="button"
@@ -1298,10 +1314,11 @@ function InputNodeForm({
   data: FlowInputData;
   onChange: (d: FlowInputData) => void;
 }) {
+  const t = useT();
   return (
     <div className="space-y-3">
       <div>
-        <Label className="text-[11px] text-zinc-600">Pergunta enviada ao usuário</Label>
+        <Label className="text-[11px] text-zinc-600">{t("Pergunta enviada ao usuário")}</Label>
         <Textarea
           rows={3}
           className="mt-1 bg-white text-xs text-zinc-900"
@@ -1311,7 +1328,7 @@ function InputNodeForm({
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <Label className="text-[11px] text-zinc-600">Salvar no campo</Label>
+          <Label className="text-[11px] text-zinc-600">{t("Salvar no campo")}</Label>
           <Input
             className="mt-1 h-8 bg-white text-xs text-zinc-900"
             value={data.field}
@@ -1322,7 +1339,7 @@ function InputNodeForm({
           />
         </div>
         <div>
-          <Label className="text-[11px] text-zinc-600">Validação</Label>
+          <Label className="text-[11px] text-zinc-600">{t("Validação")}</Label>
           <select
             className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs"
             value={data.validation}
@@ -1333,15 +1350,15 @@ function InputNodeForm({
               })
             }
           >
-            <option value="text">Texto livre</option>
-            <option value="email">E-mail</option>
-            <option value="phone">Telefone / WhatsApp</option>
-            <option value="number">Número</option>
+            <option value="text">{t("Texto livre")}</option>
+            <option value="email">{t("E-mail")}</option>
+            <option value="phone">{t("Telefone / WhatsApp")}</option>
+            <option value="number">{t("Número")}</option>
           </select>
         </div>
       </div>
       <div>
-        <Label className="text-[11px] text-zinc-600">Mensagem se resposta for inválida</Label>
+        <Label className="text-[11px] text-zinc-600">{t("Mensagem se resposta for inválida")}</Label>
         <Input
           className="mt-1 h-8 bg-white text-xs text-zinc-900"
           value={data.retryMessage}
@@ -1349,12 +1366,12 @@ function InputNodeForm({
         />
       </div>
       <div>
-        <Label className="text-[11px] text-zinc-600">Botão Pular (opcional)</Label>
+        <Label className="text-[11px] text-zinc-600">{t("Botão Pular (opcional)")}</Label>
         <Input
           className="mt-1 h-8 bg-white text-xs text-zinc-900"
           value={data.skipLabel ?? ""}
           onChange={(e) => onChange({ ...data, skipLabel: e.target.value || undefined })}
-          placeholder="Deixe vazio para não mostrar"
+          placeholder={t("Deixe vazio para não mostrar")}
         />
       </div>
     </div>
@@ -1368,28 +1385,29 @@ function ConditionNodeForm({
   data: FlowConditionData;
   onChange: (d: FlowConditionData) => void;
 }) {
+  const t = useT();
   return (
     <div className="space-y-3">
       <div>
-        <Label className="text-[11px] text-zinc-600">Regra da condição</Label>
+        <Label className="text-[11px] text-zinc-600">{t("Regra da condição")}</Label>
         <select
           className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-xs"
           value={data.op}
           onChange={(e) => onChange({ ...data, op: e.target.value as FlowConditionOp })}
         >
-          <option value="is_follower">Contato É seguidor do perfil</option>
-          <option value="not_follower">Contato NÃO é seguidor do perfil</option>
-          <option value="has_tag">Contato tem a tag</option>
-          <option value="not_has_tag">Contato NÃO tem a tag</option>
-          <option value="field_exists">Campo está preenchido</option>
-          <option value="field_equals">Campo é igual a</option>
-          <option value="field_contains">Campo contém</option>
+          <option value="is_follower">{t("Contato É seguidor do perfil")}</option>
+          <option value="not_follower">{t("Contato NÃO é seguidor do perfil")}</option>
+          <option value="has_tag">{t("Contato tem a tag")}</option>
+          <option value="not_has_tag">{t("Contato NÃO tem a tag")}</option>
+          <option value="field_exists">{t("Campo está preenchido")}</option>
+          <option value="field_equals">{t("Campo é igual a")}</option>
+          <option value="field_contains">{t("Campo contém")}</option>
         </select>
       </div>
 
       {(data.op === "has_tag" || data.op === "not_has_tag") && (
         <div>
-          <Label className="text-[11px] text-zinc-600">Tag</Label>
+          <Label className="text-[11px] text-zinc-600">{t("Tag")}</Label>
           <Input
             className="mt-1 h-8 bg-white text-xs text-zinc-900"
             value={data.tag ?? ""}
@@ -1404,7 +1422,7 @@ function ConditionNodeForm({
         data.op === "field_contains") && (
         <>
           <div>
-            <Label className="text-[11px] text-zinc-600">Campo</Label>
+            <Label className="text-[11px] text-zinc-600">{t("Campo")}</Label>
             <Input
               className="mt-1 h-8 bg-white text-xs text-zinc-900"
               value={data.field ?? ""}
@@ -1414,7 +1432,7 @@ function ConditionNodeForm({
           </div>
           {data.op !== "field_exists" && (
             <div>
-              <Label className="text-[11px] text-zinc-600">Valor</Label>
+              <Label className="text-[11px] text-zinc-600">{t("Valor")}</Label>
               <Input
                 className="mt-1 h-8 bg-white text-xs text-zinc-900"
                 value={data.value ?? ""}
@@ -1435,6 +1453,7 @@ function ActionNodeForm({
   data: FlowActionData;
   onChange: (d: FlowActionData) => void;
 }) {
+  const t = useT();
   const upd = (idx: number, patch: Partial<FlowActionItem>) =>
     onChange({
       actions: data.actions.map((a, i) => (i === idx ? { ...a, ...patch } : a)),
@@ -1446,15 +1465,15 @@ function ActionNodeForm({
         <div key={a.id} className="space-y-2 rounded-lg border border-zinc-200 p-2">
           <div className="flex items-center gap-2">
             <select
-              className="flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-xs"
+              className="flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs"
               value={a.kind}
               onChange={(e) => upd(i, { kind: e.target.value as FlowActionItem["kind"] })}
             >
-              <option value="add_tag">Adicionar tag</option>
-              <option value="remove_tag">Remover tag</option>
-              <option value="set_field">Definir campo</option>
-              <option value="handoff">Transferir para humano</option>
-              <option value="webhook">Enviar webhook (n8n, Make, CRM)</option>
+              <option value="add_tag">{t("Adicionar tag")}</option>
+              <option value="remove_tag">{t("Remover tag")}</option>
+              <option value="set_field">{t("Definir campo")}</option>
+              <option value="handoff">{t("Transferir para humano")}</option>
+              <option value="webhook">{t("Enviar webhook (n8n, Make, CRM)")}</option>
             </select>
             <button
               type="button"
@@ -1520,7 +1539,7 @@ function ActionNodeForm({
           })
         }
       >
-        <Plus className="mr-1 h-3.5 w-3.5" /> Adicionar ação
+        <Plus className="mr-1 h-3.5 w-3.5" /> {t("Adicionar ação")}
       </Button>
     </div>
   );
@@ -1533,9 +1552,10 @@ function DelayNodeForm({
   data: FlowDelayData;
   onChange: (d: FlowDelayData) => void;
 }) {
+  const t = useT();
   return (
     <div className="space-y-2">
-      <Label className="text-[11px] text-zinc-600">Minutos de espera</Label>
+      <Label className="text-[11px] text-zinc-600">{t("Minutos de espera")}</Label>
       <Input
         type="number"
         min={1}
@@ -1545,7 +1565,7 @@ function DelayNodeForm({
         onChange={(e) => onChange({ minutes: Number(e.target.value) })}
       />
       <p className="text-[10px] text-zinc-400">
-        Máximo de 23h — respeitando a janela de 24h da Meta.
+        {t("Máximo de 23h — respeitando a janela de 24h da Meta.")}
       </p>
     </div>
   );
@@ -1558,16 +1578,17 @@ function AiNodeForm({
   data: FlowAiData;
   onChange: (d: FlowAiData) => void;
 }) {
+  const t = useT();
   return (
     <div className="space-y-3">
       <div>
-        <Label className="text-[11px] text-zinc-600">Instruções e conhecimento da IA</Label>
+        <Label className="text-[11px] text-zinc-600">{t("Instruções e conhecimento da IA")}</Label>
         <Textarea
           rows={4}
           className="mt-1 bg-white text-xs text-zinc-900"
           value={data.systemPrompt}
           onChange={(e) => onChange({ ...data, systemPrompt: e.target.value })}
-          placeholder="Persona, tom de voz, preços, links..."
+          placeholder={t("Persona, tom de voz, preços, links...")}
         />
       </div>
       <label className="flex items-center gap-2 text-xs text-zinc-700">
@@ -1576,11 +1597,11 @@ function AiNodeForm({
           checked={data.conversational}
           onChange={(e) => onChange({ ...data, conversational: e.target.checked })}
         />
-        Modo conversa (responde várias mensagens seguidas)
+        {t("Modo conversa (responde várias mensagens seguidas)")}
       </label>
       {data.conversational && (
         <div>
-          <Label className="text-[11px] text-zinc-600">Máximo de turnos</Label>
+          <Label className="text-[11px] text-zinc-600">{t("Máximo de turnos")}</Label>
           <Input
             type="number"
             min={1}
@@ -1618,6 +1639,7 @@ function VisualFlowSimulator({
   graph: InstagramFlowGraph;
   onClose: () => void;
 }) {
+  const t = useT();
   const [mode, setMode] = useState<"comment" | "dm">("comment");
   const [simIsFollower, setSimIsFollower] = useState(true);
   const [bubbles, setBubbles] = useState<SimBubble[]>([]);
@@ -1786,23 +1808,23 @@ function VisualFlowSimulator({
   return (
     <div className="flex h-full max-h-[640px] flex-col bg-white text-xs">
       <div className="flex items-center gap-2 border-b border-zinc-200 px-3 py-2.5">
-        <span className="font-semibold text-zinc-900">Simulador do Fluxo</span>
+        <span className="font-semibold text-zinc-900">{t("Simulador do Fluxo")}</span>
         <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[10px] text-amber-800">
-          Teste
+          {t("Teste")}
         </Badge>
         <button
           type="button"
           onClick={reset}
-          title="Recomeçar"
-          className="ml-auto rounded p-1 text-zinc-500 hover:bg-zinc-100"
+          title={t("Recomeçar")}
+          className="ml-auto rounded-md p-1 text-zinc-500 hover:bg-zinc-100"
         >
           <RotateCcw className="h-3.5 w-3.5" />
         </button>
         <button
           type="button"
           onClick={onClose}
-          title="Fechar simulador"
-          className="rounded p-1 text-zinc-500 hover:bg-zinc-100"
+          title={t("Fechar simulador")}
+          className="rounded-md p-1 text-zinc-500 hover:bg-zinc-100"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -1810,7 +1832,7 @@ function VisualFlowSimulator({
 
       {/* Seletor se o contato simulado é seguidor ou não */}
       <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50 px-3 py-1.5 text-[11px]">
-        <span className="text-zinc-600">Perfil simulado:</span>
+        <span className="text-zinc-600">{t("Perfil simulado:")}</span>
         <button
           type="button"
           onClick={() => setSimIsFollower((f) => !f)}
@@ -1820,14 +1842,14 @@ function VisualFlowSimulator({
               : "bg-zinc-200 text-zinc-700"
           }`}
         >
-          {simIsFollower ? "✓ É Seguidor" : "Não é seguidor"}
+          {simIsFollower ? t("✓ É Seguidor") : t("Não é seguidor")}
         </button>
       </div>
 
       <div className="flex-1 space-y-2 overflow-y-auto bg-zinc-50/70 p-3">
         {bubbles.length === 0 && (
           <p className="mt-6 text-center text-xs text-zinc-400">
-            Digite a palavra-chave (ex: <b>quero</b>) abaixo para testar o disparo e clicar nos botões como o seguidor verá no Direct.
+            {t("Digite a palavra-chave (ex:")} <b>quero</b>{t(") abaixo para testar o disparo e clicar nos botões como o seguidor verá no Direct.")}
           </p>
         )}
         {bubbles.map((b, i) =>
@@ -1845,7 +1867,7 @@ function VisualFlowSimulator({
           ) : (
             <div key={i} className="max-w-[88%] space-y-1">
               {b.viaComment && (
-                <div className="text-[10px] text-zinc-400">Private Reply ao comentário</div>
+                <div className="text-[10px] text-zinc-400">{t("Private Reply ao comentário")}</div>
               )}
               {b.text && (
                 <div className="whitespace-pre-wrap rounded-2xl rounded-bl-xs border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-800 shadow-2xs">
@@ -1900,7 +1922,7 @@ function VisualFlowSimulator({
                   : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
               }`}
             >
-              {m === "comment" ? "💬 Comentário no Post" : "📩 Mensagem (DM)"}
+              {m === "comment" ? t("💬 Comentário no Post") : t("📩 Mensagem (DM)")}
             </button>
           ))}
         </div>
@@ -1916,7 +1938,7 @@ function VisualFlowSimulator({
               }
             }}
             placeholder={
-              mode === "comment" ? "Ex: quero" : "Digite uma mensagem na DM..."
+              mode === "comment" ? t("Ex: quero") : t("Digite uma mensagem na DM...")
             }
           />
           <Button type="button" size="sm" className="h-8 px-2.5" onClick={handleSend}>

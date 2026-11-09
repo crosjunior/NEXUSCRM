@@ -11,26 +11,21 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
-  HelpCircle,
   Layers,
   ShoppingBag,
-  Clock,
   ArrowRight,
-  ShieldCheck,
   Palette,
   ExternalLink,
   Copy,
   Check,
-  ChevronDown,
-  ChevronUp,
   Loader2,
   Plus,
-  Trash2,
-  Edit2,
   Image as ImageIcon,
   Type,
   Search,
 } from "lucide-react";
+import { useT } from "@/hooks/i18n/useT";
+import { copyToClipboard } from "@/lib/clipboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,7 +34,6 @@ import { slugifyEmpresa } from "@/lib/tenants/slug-pure";
 import type {
   AutonomousExtractionInput,
   AutonomousExtractionOutput,
-  GapItem,
 } from "@/lib/onboarding/autonomous-types";
 
 interface Props {
@@ -60,28 +54,6 @@ function InstagramIcon({ className = "size-3.5" }: { className?: string }) {
     </svg>
   );
 }
-
-// Catálogo de cores conhecidas para busca e seleção rápida
-const CORES_CONHECIDAS: Array<{ name: string; hex: string; category: string }> = [
-  { name: "Azul Marinho Nobre", hex: "#001b4a", category: "Azuis" },
-  { name: "Dourado Mendes", hex: "#e1b63c", category: "Dourados" },
-  { name: "Azul Ciano Corporativo", hex: "#009fe3", category: "Azuis" },
-  { name: "Azul Royal Institucional", hex: "#1e3470", category: "Azuis" },
-  { name: "Azul Celeste Vivo", hex: "#159cd8", category: "Azuis" },
-  { name: "Azul Noturno", hex: "#066aab", category: "Azuis" },
-  { name: "Verde Esmeralda", hex: "#10b981", category: "Verdes" },
-  { name: "Verde Floresta", hex: "#065f46", category: "Verdes" },
-  { name: "Verde Oliva", hex: "#506d48", category: "Verdes" },
-  { name: "Laranja Vibrante", hex: "#f97316", category: "Laranjas" },
-  { name: "Dourado Ouro", hex: "#d97706", category: "Dourados" },
-  { name: "Vermelho Rubi", hex: "#dc2626", category: "Vermelhos" },
-  { name: "Vinho Marsala", hex: "#881337", category: "Vermelhos" },
-  { name: "Roxo Real", hex: "#7c3aed", category: "Roxos" },
-  { name: "Grafite Escuro", hex: "#1e293b", category: "Neutros" },
-  { name: "Preto Nobre", hex: "#0f172a", category: "Neutros" },
-  { name: "Cinza Titânio", hex: "#475569", category: "Neutros" },
-  { name: "Prata Alumínio", hex: "#94a3b8", category: "Neutros" },
-];
 
 const FONTES_GOOGLE_TITULOS = [
   "Lato",
@@ -110,11 +82,9 @@ const FONTES_GOOGLE_TEXTOS = [
 ];
 
 export function AutonomousSetupWizard({
-  organizationId,
-  initialOrgName,
-  initialSlug,
   onFinishedRedirect = "/app/inbox",
 }: Props) {
+  const t = useT();
   const [step, setStep] = useState<WizardStep>("upload");
   const [websiteUrl, setWebsiteUrl] = useState("");
   const [instagram, setInstagram] = useState("");
@@ -123,7 +93,6 @@ export function AutonomousSetupWizard({
   const [freeformNotes, setFreeformNotes] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [files, setFiles] = useState<Array<{ name: string; type: string; size?: number; text?: string; base64_data?: string }>>([]);
-  const [showManual, setShowManual] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Estado da extração e edição
@@ -136,6 +105,27 @@ export function AutonomousSetupWizard({
   const [editingColorIndex, setEditingColorIndex] = useState<number | null>(null);
   const [colorSearchTerm, setColorSearchTerm] = useState("");
   const [customHexInput, setCustomHexInput] = useState("");
+
+  const coresConhecidas: Array<{ name: string; hex: string; category: string }> = [
+    { name: t("Azul Marinho Nobre"), hex: "#001b4a", category: t("Azuis") },
+    { name: t("Dourado Mendes"), hex: "#e1b63c", category: t("Dourados") },
+    { name: t("Azul Ciano Corporativo"), hex: "#009fe3", category: t("Azuis") },
+    { name: t("Azul Royal Institucional"), hex: "#1e3470", category: t("Azuis") },
+    { name: t("Azul Celeste Vivo"), hex: "#159cd8", category: t("Azuis") },
+    { name: t("Azul Noturno"), hex: "#066aab", category: t("Azuis") },
+    { name: t("Verde Esmeralda"), hex: "#10b981", category: t("Verdes") },
+    { name: t("Verde Floresta"), hex: "#065f46", category: t("Verdes") },
+    { name: t("Verde Oliva"), hex: "#506d48", category: t("Verdes") },
+    { name: t("Laranja Vibrante"), hex: "#f97316", category: t("Laranjas") },
+    { name: t("Dourado Ouro"), hex: "#d97706", category: t("Dourados") },
+    { name: t("Vermelho Rubi"), hex: "#dc2626", category: t("Vermelhos") },
+    { name: t("Vinho Marsala"), hex: "#881337", category: t("Vermelhos") },
+    { name: t("Roxo Real"), hex: "#7c3aed", category: t("Roxos") },
+    { name: t("Grafite Escuro"), hex: "#1e293b", category: t("Neutros") },
+    { name: t("Preto Nobre"), hex: "#0f172a", category: t("Neutros") },
+    { name: t("Cinza Titânio"), hex: "#475569", category: t("Neutros") },
+    { name: t("Prata Alumínio"), hex: "#94a3b8", category: t("Neutros") },
+  ];
 
   // Handlers de Upload de Logo Dedicado
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,7 +145,7 @@ export function AutonomousSetupWizard({
           },
         });
       }
-      toast.success("Logotipo carregado com sucesso!");
+      toast.success(t("Logotipo carregado com sucesso!"));
     };
     reader.readAsDataURL(file);
   };
@@ -166,7 +156,7 @@ export function AutonomousSetupWizard({
     if (!selectedFiles || selectedFiles.length === 0) return;
 
     setUploadingFiles(true);
-    const toastId = toast.loading(`Processando ${selectedFiles.length} arquivo(s)...`);
+    const toastId = toast.loading(`${t("Processando")} ${selectedFiles.length} ${t("arquivo(s)...")}`);
 
     try {
       const processed: typeof files = [];
@@ -204,7 +194,6 @@ export function AutonomousSetupWizard({
                 text: json.data.text,
                 base64_data: json.data.base64_data,
               });
-              // Se for imagem e parecer logotipo, atualiza preview do logo
               if (
                 json.data.base64_data &&
                 (f.name.toLowerCase().includes("logo") || f.name.toLowerCase().includes("marca"))
@@ -233,9 +222,9 @@ export function AutonomousSetupWizard({
       }
 
       setFiles((prev) => [...prev, ...processed]);
-      toast.success(`${processed.length} arquivo(s) adicionados e preparados!`, { id: toastId });
+      toast.success(`${processed.length} ${t("arquivo(s) adicionados e preparados!")}`, { id: toastId });
     } catch {
-      toast.error("Erro ao carregar alguns arquivos.", { id: toastId });
+      toast.error(t("Erro ao carregar alguns arquivos."), { id: toastId });
     } finally {
       setUploadingFiles(false);
       e.target.value = "";
@@ -249,7 +238,7 @@ export function AutonomousSetupWizard({
   // Disparo da Análise de IA
   const handleStartExtraction = async () => {
     if (!websiteUrl && !instagram && !freeformNotes && files.length === 0 && !driveLinks) {
-      toast.error("Por favor, envie ao menos um site, documento ou instrução sobre a empresa.");
+      toast.error(t("Por favor, envie ao menos um site, documento ou instrução sobre a empresa."));
       return;
     }
 
@@ -291,14 +280,14 @@ export function AutonomousSetupWizard({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || "Falha na análise dos dados.");
+        throw new Error(err.error?.message || t("Falha na análise dos dados."));
       }
 
       const json = await res.json();
       const rawBlueprint = json?.data?.blueprint || json?.data || json;
 
       if (!rawBlueprint || typeof rawBlueprint !== "object" || !("brand_identity" in rawBlueprint)) {
-        throw new Error("Não foi possível carregar a identidade da empresa a partir dos materiais.");
+        throw new Error(t("Não foi possível carregar a identidade da empresa a partir dos materiais."));
       }
 
       const extractedBlueprint: AutonomousExtractionOutput = rawBlueprint as AutonomousExtractionOutput;
@@ -325,9 +314,9 @@ export function AutonomousSetupWizard({
         setStep("review");
       }
 
-      toast.success("Dados analisados com sucesso pelo motor de IA!");
+      toast.success(t("Dados analisados com sucesso pelo motor de IA!"));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erro ao processar extração.";
+      const msg = err instanceof Error ? err.message : t("Erro ao processar extração.");
       toast.error(msg);
       setStep("upload");
     }
@@ -358,7 +347,7 @@ export function AutonomousSetupWizard({
     setEditingColorIndex(null);
     setColorSearchTerm("");
     setCustomHexInput("");
-    toast.success(`Cor ${hex} definida!`);
+    toast.success(`${t("Cor")} ${hex} ${t("definida!")}`);
   };
 
   const handleRemoveColor = (idx: number, e: React.MouseEvent) => {
@@ -399,7 +388,7 @@ export function AutonomousSetupWizard({
   const handleApplyBlueprint = async () => {
     if (!blueprint) return;
     setIsApplying(true);
-    const toastId = toast.loading("Ativando configurações no NexusCRMAgent...");
+    const toastId = toast.loading(t("Ativando configurações no CRM..."));
 
     try {
       const res = await fetch("/api/v1/onboarding/autonomous/apply", {
@@ -410,13 +399,13 @@ export function AutonomousSetupWizard({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error?.message || "Falha ao ativar o blueprint.");
+        throw new Error(err.error?.message || t("Falha ao ativar o blueprint."));
       }
 
-      toast.success("NexusCRMAgent configurado e pronto para operar!", { id: toastId });
+      toast.success(t("CRM configurado e pronto para operar!"), { id: toastId });
       setStep("success");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erro ao aplicar configurações.";
+      const msg = err instanceof Error ? err.message : t("Erro ao aplicar configurações.");
       toast.error(msg, { id: toastId });
     } finally {
       setIsApplying(false);
@@ -424,25 +413,25 @@ export function AutonomousSetupWizard({
   };
 
   const tenantDirectUrl = blueprint
-    ? `${typeof window !== "undefined" ? window.location.origin : "https://crm.nexusia.work"}/${blueprint.brand_identity.slug}`
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/${blueprint.brand_identity.slug}`
     : "";
 
   const copyTenantLink = () => {
     if (!tenantDirectUrl) return;
-    navigator.clipboard.writeText(tenantDirectUrl);
+    void copyToClipboard(tenantDirectUrl);
     setCopiedLink(true);
-    toast.success("Link do tenant copiado para a área de transferência!");
+    toast.success(t("Link do tenant copiado para a área de transferência!"));
     setTimeout(() => setCopiedLink(false), 2500);
   };
 
   const copyMarkdown = () => {
     if (!blueprint?.master_knowledge_markdown) return;
-    navigator.clipboard.writeText(blueprint.master_knowledge_markdown);
-    toast.success("Base de conhecimento completa copiada em Markdown!");
+    void copyToClipboard(blueprint.master_knowledge_markdown);
+    toast.success(t("Base de conhecimento completa copiada em Markdown!"));
   };
 
   // Cores filtradas pela busca
-  const filteredCores = CORES_CONHECIDAS.filter(
+  const filteredCores = coresConhecidas.filter(
     (c) =>
       c.name.toLowerCase().includes(colorSearchTerm.toLowerCase()) ||
       c.hex.toLowerCase().includes(colorSearchTerm.toLowerCase()) ||
@@ -455,13 +444,13 @@ export function AutonomousSetupWizard({
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2 text-primary font-medium text-xs tracking-wide uppercase">
           <Sparkles className="size-4" />
-          <span>Configuração Autônoma NexusCRMAgent</span>
+          <span>{t("Configuração Autônoma de IA")}</span>
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          Assistente de Configuração Inteligente
+          {t("Assistente de Configuração Inteligente")}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Envie os materiais que já possui (site, Instagram, PDFs de propostas, fotos de panfletos, links no Drive). Nossa inteligência artificial extrai toda a identidade, regras comerciais e ativa o CRM pronto para operar.
+          {t("Envie os materiais que já possui (site, Instagram, PDFs de propostas, fotos de panfletos, links no Drive). Nossa inteligência artificial extrai toda a identidade, regras comerciais e ativa o CRM pronto para operar.")}
         </p>
       </div>
 
@@ -472,17 +461,17 @@ export function AutonomousSetupWizard({
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5 font-semibold text-sm">
               <ImageIcon className="size-4 text-primary" />
-              <span>Logotipo da Empresa (PNG, SVG, JPG ou WebP)</span>
+              <span>{t("Logotipo da Empresa (PNG, SVG, JPG ou WebP)")}</span>
             </Label>
             <div className="flex flex-col sm:flex-row items-center gap-4 p-4 border border-border rounded-lg bg-surface/30">
               {logoPreview ? (
                 <div className="relative size-20 rounded-lg border border-border bg-background p-1 flex items-center justify-center shrink-0">
-                  <img src={logoPreview} alt="Logo Preview" className="max-h-full max-w-full object-contain" />
+                  <img src={logoPreview} alt="Logo" className="max-h-full max-w-full object-contain" />
                   <button
                     type="button"
                     onClick={() => setLogoPreview(null)}
                     className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground size-5 rounded-full flex items-center justify-center text-xs"
-                    title="Remover"
+                    title={t("Remover")}
                   >
                     ×
                   </button>
@@ -494,11 +483,11 @@ export function AutonomousSetupWizard({
               )}
               <div className="flex-1 space-y-1 text-center sm:text-left">
                 <p className="text-xs text-muted-foreground">
-                  Selecione o logo oficial da empresa para a tela de login personalizada e branding do WhatsApp.
+                  {t("Selecione o logo oficial da empresa para a tela de login personalizada e branding do WhatsApp.")}
                 </p>
-                <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded text-xs font-medium cursor-pointer transition-colors">
+                <label className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-md text-xs font-medium cursor-pointer transition-colors">
                   <Upload className="size-3.5" />
-                  <span>{logoPreview ? "Alterar Logotipo" : "Selecionar Logotipo"}</span>
+                  <span>{logoPreview ? t("Alterar Logotipo") : t("Selecionar Logotipo")}</span>
                   <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
                 </label>
               </div>
@@ -510,32 +499,32 @@ export function AutonomousSetupWizard({
             <div className="space-y-1.5">
               <Label htmlFor="website_url" className="flex items-center gap-1.5">
                 <Globe className="size-3.5 text-muted-foreground" />
-                <span>Site Oficial</span>
+                <span>{t("Site Oficial")}</span>
               </Label>
               <Input
                 id="website_url"
-                placeholder="https://grupomendes.com.br/"
+                placeholder="https://x.example.com/"
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
               />
               <span className="text-[11px] text-muted-foreground">
-                Lemos o HTML, paleta no CSS, fontes do Google e logotipo diretamente.
+                {t("Lemos o HTML, paleta no CSS, fontes do Google e logotipo diretamente.")}
               </span>
             </div>
 
             <div className="space-y-1.5">
               <Label htmlFor="instagram" className="flex items-center gap-1.5">
                 <InstagramIcon className="size-3.5 text-muted-foreground" />
-                <span>Instagram Comercial</span>
+                <span>{t("Instagram Comercial")}</span>
               </Label>
               <Input
                 id="instagram"
-                placeholder="https://www.instagram.com/grupomendesoficial/"
+                placeholder="@suaempresa"
                 value={instagram}
                 onChange={(e) => setInstagram(e.target.value)}
               />
               <span className="text-[11px] text-muted-foreground">
-                Para capturar o tom de voz e integrar leads do Direct.
+                {t("Para capturar o tom de voz e integrar leads do Direct.")}
               </span>
             </div>
           </div>
@@ -544,11 +533,11 @@ export function AutonomousSetupWizard({
             <div className="space-y-1.5">
               <Label htmlFor="google_maps_url" className="flex items-center gap-1.5">
                 <MapPin className="size-3.5 text-muted-foreground" />
-                <span>Google Maps / Google Meu Negócio</span>
+                <span>{t("Google Maps / Google Meu Negócio")}</span>
               </Label>
               <Input
                 id="google_maps_url"
-                placeholder="Link da localização da empresa"
+                placeholder={t("Link da localização da empresa")}
                 value={googleMapsUrl}
                 onChange={(e) => setGoogleMapsUrl(e.target.value)}
               />
@@ -557,11 +546,11 @@ export function AutonomousSetupWizard({
             <div className="space-y-1.5">
               <Label htmlFor="drive_links" className="flex items-center gap-1.5">
                 <FolderOpen className="size-3.5 text-muted-foreground" />
-                <span>Pasta de Arquivos (Google Drive / OneDrive)</span>
+                <span>{t("Pasta de Arquivos (Google Drive / OneDrive)")}</span>
               </Label>
               <Input
                 id="drive_links"
-                placeholder="Link compartilhado de pasta ou arquivos"
+                placeholder={t("Link compartilhado de pasta ou arquivos")}
                 value={driveLinks}
                 onChange={(e) => setDriveLinks(e.target.value)}
               />
@@ -572,21 +561,21 @@ export function AutonomousSetupWizard({
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5">
               <FileText className="size-3.5 text-muted-foreground" />
-              <span>Arquivos de Apresentação, Tabelas e Fichas Técnicas (PDF, Markdown, Imagens, CSV)</span>
+              <span>{t("Arquivos de Apresentação, Tabelas e Fichas Técnicas (PDF, Markdown, Imagens, CSV)")}</span>
             </Label>
             <label className="flex flex-col items-center justify-center border-2 border-dashed border-border hover:border-primary/50 bg-surface/30 rounded-lg p-6 cursor-pointer transition-colors relative">
               {uploadingFiles ? (
                 <div className="flex flex-col items-center gap-2 text-primary">
                   <Loader2 className="size-8 animate-spin" />
-                  <span className="text-sm font-medium">Extraindo texto dos documentos no servidor...</span>
-                  <span className="text-xs text-muted-foreground">Por favor aguarde alguns instantes</span>
+                  <span className="text-sm font-medium">{t("Extraindo texto dos documentos no servidor...")}</span>
+                  <span className="text-xs text-muted-foreground">{t("Por favor aguarde alguns instantes")}</span>
                 </div>
               ) : (
                 <>
                   <Upload className="size-8 text-muted-foreground mb-2" />
-                  <span className="text-sm font-medium">Clique para selecionar ou arraste arquivos aqui</span>
+                  <span className="text-sm font-medium">{t("Clique para selecionar ou arraste arquivos aqui")}</span>
                   <span className="text-xs text-muted-foreground mt-1">
-                    Suporta múltiplos PDFs, imagens, Markdown (.md), CSV e TXT (sem limite de arquivos)
+                    {t("Suporta múltiplos PDFs, imagens, Markdown (.md), CSV e TXT (sem limite de arquivos)")}
                   </span>
                 </>
               )}
@@ -604,7 +593,7 @@ export function AutonomousSetupWizard({
             {files.length > 0 && (
               <div className="space-y-2 pt-2">
                 <span className="text-xs font-semibold uppercase text-muted-foreground tracking-wider">
-                  Arquivos prontos para análise ({files.length}):
+                  {t("Arquivos prontos para análise")} ({files.length}):
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
                   {files.map((file, idx) => (
@@ -616,13 +605,13 @@ export function AutonomousSetupWizard({
                         <FileText className="size-4 shrink-0 text-primary" />
                         <span className="truncate font-medium">{file.name}</span>
                         {file.text && (
-                          <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-mono shrink-0">
-                            Texto Extraído
+                          <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary text-[10px] font-mono shrink-0">
+                            {t("Texto Extraído")}
                           </span>
                         )}
                         {file.base64_data && (
-                          <span className="px-1.5 py-0.5 rounded bg-accent/10 text-accent text-[10px] font-mono shrink-0">
-                            Imagem
+                          <span className="px-1.5 py-0.5 rounded-md bg-accent/10 text-accent text-[10px] font-mono shrink-0">
+                            {t("Imagem")}
                           </span>
                         )}
                       </div>
@@ -631,7 +620,7 @@ export function AutonomousSetupWizard({
                         onClick={() => removeFile(idx)}
                         className="text-destructive hover:underline text-[11px] shrink-0 ml-2"
                       >
-                        Remover
+                        {t("Remover")}
                       </button>
                     </div>
                   ))}
@@ -642,11 +631,11 @@ export function AutonomousSetupWizard({
 
           {/* Notas Livres e Cenários */}
           <div className="space-y-1.5">
-            <Label htmlFor="freeform_notes">Observações do Negócio e Cenários Especiais</Label>
+            <Label htmlFor="freeform_notes">{t("Observações do Negócio e Cenários Especiais")}</Label>
             <Textarea
               id="freeform_notes"
               rows={3}
-              placeholder="Ex.: 'Empresa: Grupo Mendes. Foco em imóveis e loteamentos de alto padrão. Condições de 20% entrada e restante em até 60x direto. Horário comercial seg a sex 8h às 18h.'"
+              placeholder={t("Ex.: 'Empresa: Grupo Mendes. Foco em imóveis e loteamentos de alto padrão. Condições de 20% entrada e restante em até 60x direto. Horário comercial seg a sex 8h às 18h.'")}
               value={freeformNotes}
               onChange={(e) => setFreeformNotes(e.target.value)}
             />
@@ -655,7 +644,7 @@ export function AutonomousSetupWizard({
           <div className="flex justify-end pt-4 border-t border-border">
             <Button onClick={handleStartExtraction} className="gap-2 bg-primary text-primary-foreground font-semibold px-6">
               <Sparkles className="size-4" />
-              <span>Iniciar Análise e Parametrização Autônoma</span>
+              <span>{t("Iniciar Análise e Parametrização Autônoma")}</span>
               <ArrowRight className="size-4" />
             </Button>
           </div>
@@ -669,23 +658,23 @@ export function AutonomousSetupWizard({
             <Sparkles className="size-10" />
           </div>
           <div className="space-y-2 max-w-md mx-auto">
-            <h3 className="text-xl font-bold">Analisando materiais com Google Gemini Flash...</h3>
+            <h3 className="text-xl font-bold">{t("Analisando materiais com Google Gemini Flash...")}</h3>
             <p className="text-xs text-muted-foreground">
-              Estamos realizando o web scraping do site oficial, analisando a paleta de cores no CSS, fontes do Google, logotipo e processando o texto de todos os documentos anexados.
+              {t("Estamos realizando o web scraping do site oficial, analisando a paleta de cores no CSS, fontes do Google, logotipo e processando o texto de todos os documentos anexados.")}
             </p>
           </div>
           <div className="space-y-2.5 max-w-sm mx-auto text-left text-xs">
             <div className="flex items-center gap-2 text-primary font-medium">
               <CheckCircle2 className="size-4 shrink-0" />
-              <span>Extraindo cores e tipografia do site...</span>
+              <span>{t("Extraindo cores e tipografia do site...")}</span>
             </div>
             <div className="flex items-center gap-2 text-primary font-medium">
               <CheckCircle2 className="size-4 shrink-0" />
-              <span>Lendo fichas técnicas, tabelas e propostas comerciais...</span>
+              <span>{t("Lendo fichas técnicas, tabelas e propostas comerciais...")}</span>
             </div>
             <div className="flex items-center gap-2 text-muted-foreground animate-pulse font-medium">
               <span className="size-2 rounded-full bg-primary" />
-              <span>Estruturando base de conhecimento e funil de vendas...</span>
+              <span>{t("Estruturando base de conhecimento e funil de vendas...")}</span>
             </div>
           </div>
         </div>
@@ -697,11 +686,11 @@ export function AutonomousSetupWizard({
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-amber-500 font-medium text-xs">
               <AlertCircle className="size-4" />
-              <span>Ajustes Finais Recomendados</span>
+              <span>{t("Ajustes Finais Recomendados")}</span>
             </div>
-            <h2 className="text-xl font-bold tracking-tight">Complete algumas informações pontuais</h2>
+            <h2 className="text-xl font-bold tracking-tight">{t("Complete algumas informações pontuais")}</h2>
             <p className="text-xs text-muted-foreground">
-              A IA mapeou a maior parte dos dados, mas precisa de confirmação para os pontos abaixo.
+              {t("A IA mapeou a maior parte dos dados, mas precisa de confirmação para os pontos abaixo.")}
             </p>
           </div>
 
@@ -724,10 +713,10 @@ export function AutonomousSetupWizard({
 
           <div className="flex justify-between items-center pt-4 border-t border-border">
             <Button variant="outline" onClick={() => setStep("review")}>
-              Pular e Revisar
+              {t("Pular e Revisar")}
             </Button>
             <Button onClick={handleAdvanceFromGaps} className="gap-2">
-              <span>Salvar e Revisar Blueprint</span>
+              <span>{t("Salvar e Revisar Blueprint")}</span>
               <ArrowRight className="size-4" />
             </Button>
           </div>
@@ -741,15 +730,15 @@ export function AutonomousSetupWizard({
             <div>
               <div className="flex items-center gap-2 text-emerald-600 font-semibold text-xs mb-1">
                 <CheckCircle2 className="size-4" />
-                <span>Blueprint Parametrizado com Sucesso</span>
+                <span>{t("Blueprint Parametrizado com Sucesso")}</span>
               </div>
-              <h2 className="text-2xl font-bold tracking-tight">Revise a Configuração do CRM</h2>
+              <h2 className="text-2xl font-bold tracking-tight">{t("Revise a Configuração do CRM")}</h2>
               <p className="text-xs text-muted-foreground">
-                Todos os dados foram extraídos. Você pode editar o nome, cores, fontes e logotipo antes de ativar.
+                {t("Todos os dados foram extraídos. Você pode editar o nome, cores, fontes e logotipo antes de ativar.")}
               </p>
             </div>
             <div className="text-left sm:text-right p-2.5 rounded-lg bg-surface border border-border">
-              <span className="text-[11px] text-muted-foreground block">Link Direto via Tenant:</span>
+              <span className="text-[11px] text-muted-foreground block">{t("Link Direto via Tenant:")}</span>
               <span className="font-mono text-xs font-bold text-primary">/{blueprint.brand_identity.slug}</span>
             </div>
           </div>
@@ -759,7 +748,7 @@ export function AutonomousSetupWizard({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Palette className="size-4 text-primary" />
-                <h3 className="text-sm font-bold">Identidade Visual da Marca</h3>
+                <h3 className="text-sm font-bold">{t("Identidade Visual da Marca")}</h3>
               </div>
               <span className="text-xs text-muted-foreground font-mono">
                 {blueprint.brand_identity.font_primary || "Lato"} / {blueprint.brand_identity.font_secondary || "Inter"}
@@ -769,26 +758,26 @@ export function AutonomousSetupWizard({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Logo Preview & Upload */}
               <div className="space-y-1.5">
-                <Label className="text-xs">Logotipo Oficial</Label>
+                <Label className="text-xs">{t("Logotipo Oficial")}</Label>
                 <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-background">
                   {blueprint.brand_identity.logo_url ? (
                     <img
                       src={blueprint.brand_identity.logo_url}
                       alt="Logo"
-                      className="size-12 object-contain rounded bg-muted/40 p-1 shrink-0"
+                      className="size-12 object-contain rounded-md bg-muted/40 p-1 shrink-0"
                     />
                   ) : (
-                    <div className="size-12 rounded border border-dashed border-border flex items-center justify-center text-muted-foreground shrink-0">
+                    <div className="size-12 rounded-md border border-dashed border-border flex items-center justify-center text-muted-foreground shrink-0">
                       <ImageIcon className="size-5" />
                     </div>
                   )}
                   <div className="flex-1 space-y-1">
                     <label className="text-xs text-primary hover:underline cursor-pointer block font-medium">
-                      <span>Alterar Arquivo</span>
+                      <span>{t("Alterar Arquivo")}</span>
                       <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
                     </label>
                     <Input
-                      placeholder="Ou cole a URL do Logo"
+                      placeholder={t("Ou cole a URL do Logo")}
                       value={blueprint.brand_identity.logo_url || ""}
                       onChange={(e) =>
                         setBlueprint({
@@ -805,7 +794,7 @@ export function AutonomousSetupWizard({
               {/* Nome da Empresa */}
               <div className="space-y-1.5">
                 <Label htmlFor="edit_org_name" className="text-xs font-semibold">
-                  Nome Oficial da Empresa (Com espaços e acentos)
+                  {t("Nome Oficial da Empresa (Com espaços e acentos)")}
                 </Label>
                 <Input
                   id="edit_org_name"
@@ -821,18 +810,18 @@ export function AutonomousSetupWizard({
                       },
                     });
                   }}
-                  placeholder="Ex.: Grupo Mendes"
+                  placeholder={t("Ex.: Grupo Mendes")}
                   className="font-semibold text-sm"
                 />
                 <span className="text-[11px] text-muted-foreground">
-                  Exibido na tela de login e nas mensagens com o cliente.
+                  {t("Exibido na tela de login e nas mensagens com o cliente.")}
                 </span>
               </div>
 
               {/* Slug do Tenant */}
               <div className="space-y-1.5">
                 <Label htmlFor="edit_org_slug" className="text-xs font-semibold">
-                  Slug do Tenant (Acesso URL)
+                  {t("Slug do Tenant (Acesso URL)")}
                 </Label>
                 <Input
                   id="edit_org_slug"
@@ -852,7 +841,7 @@ export function AutonomousSetupWizard({
                   className="font-mono text-xs text-primary font-bold"
                 />
                 <span className="text-[11px] text-muted-foreground">
-                  Acesso: <strong>crm.nexusia.work/{blueprint.brand_identity.slug}</strong>
+                  {t("Acesso:")} <strong>/{blueprint.brand_identity.slug}</strong>
                 </span>
               </div>
             </div>
@@ -862,10 +851,10 @@ export function AutonomousSetupWizard({
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-semibold flex items-center gap-1.5">
                   <Palette className="size-3.5 text-primary" />
-                  <span>Paleta de Cores da Marca (até 5 cores no total)</span>
+                  <span>{t("Paleta de Cores da Marca (até 5 cores no total)")}</span>
                 </Label>
                 <span className="text-[11px] text-muted-foreground">
-                  Clique na cor para alterar pelo nome ou código
+                  {t("Clique na cor para alterar pelo nome ou código")}
                 </span>
               </div>
 
@@ -878,7 +867,7 @@ export function AutonomousSetupWizard({
                       setCustomHexInput(hex);
                     }}
                     className="flex items-center gap-2 border border-border rounded-lg px-3 py-1.5 bg-background hover:border-primary/60 cursor-pointer transition-all shadow-sm"
-                    title={`Clique para alterar a cor ${idx + 1}`}
+                    title={t("Clique para alterar a cor")}
                   >
                     <span
                       className="size-5 rounded-full border border-black/10 shrink-0"
@@ -886,14 +875,14 @@ export function AutonomousSetupWizard({
                     />
                     <span className="font-mono text-xs font-semibold">{hex}</span>
                     <span className="text-[10px] text-muted-foreground font-sans">
-                      {idx === 0 ? "(Primária)" : idx === 1 ? "(Secundária)" : idx === 2 ? "(Destaque)" : ""}
+                      {idx === 0 ? t("(Primária)") : idx === 1 ? t("(Secundária)") : idx === 2 ? t("(Destaque)") : ""}
                     </span>
                     {(blueprint.brand_identity.colors?.length || 0) > 1 && (
                       <button
                         type="button"
                         onClick={(e) => handleRemoveColor(idx, e)}
                         className="text-muted-foreground hover:text-destructive text-xs ml-1"
-                        title="Remover cor"
+                        title={t("Remover cor")}
                       >
                         ×
                       </button>
@@ -913,7 +902,7 @@ export function AutonomousSetupWizard({
                     className="gap-1.5 text-xs h-8"
                   >
                     <Plus className="size-3.5" />
-                    <span>Adicionar Cor</span>
+                    <span>{t("Adicionar Cor")}</span>
                   </Button>
                 )}
               </div>
@@ -924,7 +913,7 @@ export function AutonomousSetupWizard({
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold flex items-center gap-1.5">
                   <Type className="size-3.5 text-primary" />
-                  <span>Fonte Primária (Títulos e Destaques)</span>
+                  <span>{t("Fonte Primária (Títulos e Destaques)")}</span>
                 </Label>
                 <select
                   value={blueprint.brand_identity.font_primary || "Lato"}
@@ -951,7 +940,7 @@ export function AutonomousSetupWizard({
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold flex items-center gap-1.5">
                   <Type className="size-3.5 text-muted-foreground" />
-                  <span>Fonte Secundária (Textos e Leituras)</span>
+                  <span>{t("Fonte Secundária (Textos e Leituras)")}</span>
                 </Label>
                 <select
                   value={blueprint.brand_identity.font_secondary || "Inter"}
@@ -985,25 +974,25 @@ export function AutonomousSetupWizard({
                 <div className="flex items-center gap-2">
                   <ShoppingBag className="size-4 text-primary" />
                   <h3 className="text-sm font-semibold">
-                    Catálogo Extraído ({blueprint.catalog.length})
+                    {t("Catálogo Extraído")} ({blueprint.catalog.length})
                   </h3>
                 </div>
                 <span className="text-xs text-muted-foreground">{blueprint.niche}</span>
               </div>
               <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                 {blueprint.catalog.map((item, idx) => (
-                  <div key={idx} className="p-2.5 rounded bg-background border border-border text-xs flex justify-between items-start">
+                  <div key={idx} className="p-2.5 rounded-md bg-background border border-border text-xs flex justify-between items-start">
                     <div className="space-y-0.5">
                       <span className="font-semibold block">{item.name}</span>
                       <p className="text-[11px] text-muted-foreground line-clamp-1">{item.description}</p>
-                      <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded font-mono">
+                      <span className="text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded-md font-mono">
                         {item.category}
                       </span>
                     </div>
                     <span className="font-bold text-primary text-xs shrink-0 ml-2">
                       {item.price_cents > 0
                         ? (item.price_cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-                        : "Sob Consulta"}
+                        : t("Sob Consulta")}
                     </span>
                   </div>
                 ))}
@@ -1016,10 +1005,10 @@ export function AutonomousSetupWizard({
                 <div className="flex items-center gap-2">
                   <Layers className="size-4 text-primary" />
                   <h3 className="text-sm font-semibold">
-                    Funil sob Medida ({blueprint.sales_funnel.stages.length} etapas)
+                    {t("Funil sob Medida")} ({blueprint.sales_funnel.stages.length} {t("etapas")})
                   </h3>
                 </div>
-                <span className="text-[11px] text-muted-foreground">Horário: {blueprint.business_rules.operating_hours}</span>
+                <span className="text-[11px] text-muted-foreground">{t("Horário:")} {blueprint.business_rules.operating_hours}</span>
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 {blueprint.sales_funnel.stages.map((st, idx) => (
@@ -1034,8 +1023,8 @@ export function AutonomousSetupWizard({
                   </div>
                 ))}
               </div>
-              <div className="p-2.5 rounded bg-background border border-border text-xs space-y-1 mt-2">
-                <span className="font-semibold block">Gatilhos de Transbordo Humano:</span>
+              <div className="p-2.5 rounded-md bg-background border border-border text-xs space-y-1 mt-2">
+                <span className="font-semibold block">{t("Gatilhos de Transbordo Humano:")}</span>
                 <p className="text-[11px] text-muted-foreground">
                   {blueprint.human_handoff.trigger_keywords.join(", ")}
                 </p>
@@ -1048,21 +1037,21 @@ export function AutonomousSetupWizard({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <FileText className="size-4 text-primary" />
-                <h3 className="text-sm font-bold">Base de Conhecimento Mestre Extraída (Markdown Oficial)</h3>
+                <h3 className="text-sm font-bold">{t("Base de Conhecimento Mestre Extraída (Markdown Oficial)")}</h3>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground font-mono">
-                  {blueprint.master_knowledge_markdown.length.toLocaleString("pt-BR")} caracteres extraídos
+                  {blueprint.master_knowledge_markdown.length.toLocaleString("pt-BR")} {t("caracteres extraídos")}
                 </span>
                 <Button size="sm" variant="outline" onClick={copyMarkdown} className="gap-1.5 text-xs h-7">
                   <Copy className="size-3.5" />
-                  <span>Copiar Markdown</span>
+                  <span>{t("Copiar Markdown")}</span>
                 </Button>
               </div>
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Abaixo está o acervo integral compilado a partir de todos os seus 18 arquivos, sites e tabelas. Este documento alimenta o cérebro do agente de IA e os atendentes.
+              {t("Abaixo está o acervo integral compilado a partir de todos os seus arquivos, sites e tabelas. Este documento alimenta o cérebro do agente de IA e os atendentes.")}
             </p>
 
             <Textarea
@@ -1076,7 +1065,7 @@ export function AutonomousSetupWizard({
           {/* BOTÕES DE AÇÃO */}
           <div className="flex justify-between items-center pt-4 border-t border-border">
             <Button variant="outline" onClick={() => setStep("upload")} disabled={isApplying}>
-              Voltar e Adicionar Mais Materiais
+              {t("Voltar e Adicionar Mais Materiais")}
             </Button>
             <Button
               onClick={handleApplyBlueprint}
@@ -1084,7 +1073,7 @@ export function AutonomousSetupWizard({
               className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 shadow-md"
             >
               <Sparkles className="size-4" />
-              <span>{isApplying ? "Ativando no Servidor..." : "Ativar NexusCRMAgent com 1 Clique"}</span>
+              <span>{isApplying ? t("Ativando no Servidor...") : t("Ativar CRM com 1 Clique")}</span>
               <ArrowRight className="size-4" />
             </Button>
           </div>
@@ -1100,40 +1089,40 @@ export function AutonomousSetupWizard({
 
           <div className="space-y-2 max-w-lg mx-auto">
             <h2 className="text-2xl font-bold tracking-tight">
-              {blueprint.brand_identity.name} está Configurado e no Ar! 🚀
+              {blueprint.brand_identity.name} {t("está Configurado e no Ar!")} 🚀
             </h2>
             <p className="text-xs text-muted-foreground">
-              Seu assistente de vendas, catálogo de produtos, funil comercial e base de conhecimento estão operando.
+              {t("Seu assistente de vendas, catálogo de produtos, funil comercial e base de conhecimento estão operando.")}
             </p>
           </div>
 
           {/* Link direto do Tenant */}
           <div className="max-w-md mx-auto p-4 rounded-xl border border-primary/20 bg-primary/5 text-left space-y-2">
             <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-              <span>🔗 Link de Acesso Direto da Empresa (Tenant):</span>
+              <span>{t("🔗 Link de Acesso Direto da Empresa (Tenant):")}</span>
             </span>
             <div className="flex items-center gap-2">
               <Input readOnly value={tenantDirectUrl} className="font-mono text-xs bg-background font-bold text-primary" />
               <Button size="sm" variant="outline" onClick={copyTenantLink} className="gap-1.5 shrink-0">
                 {copiedLink ? <Check className="size-3.5 text-emerald-600" /> : <Copy className="size-3.5" />}
-                <span>{copiedLink ? "Copiado!" : "Copiar"}</span>
+                <span>{copiedLink ? t("Copiado!") : t("Copiar")}</span>
               </Button>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Ao entrar por este link, sua equipe verá a tela de login personalizada com o nome e logo do {blueprint.brand_identity.name}.
+              {t("Ao entrar por este link, sua equipe verá a tela de login personalizada com o nome e logo do")} {blueprint.brand_identity.name}.
             </p>
           </div>
 
           <div className="flex flex-wrap justify-center gap-3 pt-4">
             <Button asChild variant="outline">
               <a href="/onboarding/connect-whatsapp" className="gap-2">
-                <span>Conectar WhatsApp (QR Code)</span>
+                <span>{t("Conectar WhatsApp (QR Code)")}</span>
                 <ExternalLink className="size-3.5" />
               </a>
             </Button>
             <Button asChild className="bg-primary text-primary-foreground font-semibold px-6">
               <a href={onFinishedRedirect} className="gap-2">
-                <span>Ir para a Caixa de Entrada (Inbox)</span>
+                <span>{t("Ir para a Caixa de Entrada (Inbox)")}</span>
                 <ArrowRight className="size-4" />
               </a>
             </Button>
@@ -1150,8 +1139,8 @@ export function AutonomousSetupWizard({
                 <Palette className="size-4 text-primary" />
                 <h3 className="font-bold text-sm">
                   {editingColorIndex < (blueprint?.brand_identity.colors?.length || 0)
-                    ? `Alterar Cor ${editingColorIndex + 1}`
-                    : "Adicionar Nova Cor"}
+                    ? `${t("Alterar Cor")} ${editingColorIndex + 1}`
+                    : t("Adicionar Nova Cor")}
                 </h3>
               </div>
               <button
@@ -1165,18 +1154,18 @@ export function AutonomousSetupWizard({
 
             {/* Input customizado com color picker nativo e digitação */}
             <div className="space-y-1.5">
-              <Label className="text-xs">Digite o Código #HEX ou Escolha no Seletor:</Label>
+              <Label className="text-xs">{t("Digite o Código #HEX ou Escolha no Seletor:")}</Label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
                   value={customHexInput.startsWith("#") && customHexInput.length === 7 ? customHexInput : "#001b4a"}
                   onChange={(e) => setCustomHexInput(e.target.value)}
-                  className="size-9 rounded border border-border cursor-pointer p-0.5 shrink-0 bg-transparent"
+                  className="size-9 rounded-md border border-border cursor-pointer p-0.5 shrink-0 bg-transparent"
                 />
                 <Input
                   value={customHexInput}
                   onChange={(e) => setCustomHexInput(e.target.value)}
-                  placeholder="#001b4a ou #e1b63c"
+                  placeholder="#001b4a / #e1b63c"
                   className="font-mono text-xs uppercase"
                 />
                 <Button
@@ -1185,12 +1174,12 @@ export function AutonomousSetupWizard({
                     if (/^#[0-9a-fA-F]{3,8}$/.test(customHexInput)) {
                       handleSelectColor(customHexInput);
                     } else {
-                      toast.error("Formato hexadecimal inválido (ex: #001b4a)");
+                      toast.error(t("Formato hexadecimal inválido (ex: #001b4a)"));
                     }
                   }}
                   className="shrink-0 text-xs"
                 >
-                  Confirmar
+                  {t("Confirmar")}
                 </Button>
               </div>
             </div>
@@ -1200,7 +1189,7 @@ export function AutonomousSetupWizard({
               <div className="relative">
                 <Search className="size-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
                 <Input
-                  placeholder="Pesquisar cor (ex: dourado, azul, marinho, verde)..."
+                  placeholder={t("Pesquisar cor (ex: dourado, azul, marinho, verde)...")}
                   value={colorSearchTerm}
                   onChange={(e) => setColorSearchTerm(e.target.value)}
                   className="pl-8 text-xs h-8"
@@ -1228,7 +1217,7 @@ export function AutonomousSetupWizard({
 
             <div className="flex justify-end pt-2">
               <Button variant="ghost" size="sm" onClick={() => setEditingColorIndex(null)} className="text-xs">
-                Cancelar
+                {t("Cancelar")}
               </Button>
             </div>
           </div>

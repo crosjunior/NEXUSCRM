@@ -103,7 +103,8 @@ export async function aplicarBlueprintAutonomo(
           model: "gemini-3.5-flash",
           is_active: true,
         })
-        .eq("id", agentId);
+        .eq("id", agentId)
+        .eq("organization_id", organizationId);
     } else {
       const { data: newAgent } = await admin
         .from("ai_agents")
@@ -133,6 +134,7 @@ export async function aplicarBlueprintAutonomo(
         .from("ai_agent_versions")
         .select("version_number")
         .eq("agent_id", agentId)
+        .eq("organization_id", organizationId)
         .order("version_number", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -140,15 +142,41 @@ export async function aplicarBlueprintAutonomo(
       const nextVersion = (maxVer?.version_number ?? 0) + 1;
 
       await admin.from("ai_agent_versions").insert({
+        organization_id: organizationId,
         agent_id: agentId,
         version_number: nextVersion,
         system_prompt: agentPrompt,
         provider: "google",
         model: "gemini-3.5-flash",
-        temperature: 0.3,
+        credential_id: cred?.id ?? null,
+        tool_ids: [],
+        trigger_config: undefined,
+        channel_session_id: null,
+        max_steps: 10,
+        token_budget: 50000,
+        cost_budget_cents: 50,
+        history_message_window: 20,
+        history_token_window: 8000,
+        handoff_keywords: blueprint.human_handoff.trigger_keywords,
+        handoff_tool_enabled: true,
+        handoff_legal_enabled: true,
+        proposal_ai_draft_enabled: true,
+        cases_enabled: false,
+        split_messages: false,
+        split_max_chars: 600,
+        inbound_debounce_ms: null,
+        followup: {
+          enabled: false,
+          flow_pointer_ids: [],
+          send_window: null,
+        },
+        operator_enabled: false,
+        operator_model: null,
+        operator_tool_ids: [],
+        pipeline_ids: [],
+        knowledge_source_ids: [],
         status: "published",
         created_by: userId,
-        ...(cred?.id ? { credential_id: cred.id } : {}),
       });
     }
 
@@ -178,7 +206,11 @@ export async function aplicarBlueprintAutonomo(
 
     if (pipelineId && blueprint.sales_funnel.stages.length > 0) {
       // Deleta estágios antigos daquele funil se for primeira inicialização
-      await admin.from("crm_stages").delete().eq("pipeline_id", pipelineId);
+      await admin
+        .from("crm_stages")
+        .delete()
+        .eq("pipeline_id", pipelineId)
+        .eq("organization_id", organizationId);
 
       const stagesToInsert = blueprint.sales_funnel.stages.map((st, idx) => ({
         pipeline_id: pipelineId,
@@ -222,7 +254,8 @@ export async function aplicarBlueprintAutonomo(
           status: "ready",
           is_active: true,
         })
-        .eq("id", knowledgeSourceId);
+        .eq("id", knowledgeSourceId)
+        .eq("organization_id", organizationId);
     } else {
       const { data: newSource } = await admin
         .from("ai_knowledge_sources")
@@ -255,7 +288,11 @@ export async function aplicarBlueprintAutonomo(
 
       // Se tiver FAQs extraídas, insere no FAQ index
       if (blueprint.objections_and_faqs.faqs.length > 0) {
-        await admin.from("ai_faq_items").delete().eq("knowledge_source_id", knowledgeSourceId);
+        await admin
+          .from("ai_faq_items")
+          .delete()
+          .eq("knowledge_source_id", knowledgeSourceId)
+          .eq("organization_id", organizationId);
 
         const faqsToInsert = blueprint.objections_and_faqs.faqs.map((f) => ({
           organization_id: organizationId,

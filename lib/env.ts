@@ -628,14 +628,6 @@ const schema = z.object({
   META_GRAPH_BASE_URL: z.string().optional().default(""),
   META_ADS_GRAPH_BASE_URL: z.string().optional().default(""),
 
-  // Instagram Oficial / Meta Graph API
-  INSTAGRAM_APP_ID: z.string().optional().default(""),
-  INSTAGRAM_APP_SECRET: z.string().optional().default(""),
-  INSTAGRAM_CONFIG_ID: z.string().optional().default(""),
-  INSTAGRAM_WEBHOOK_VERIFY_TOKEN: z.string().optional().default(""),
-  INSTAGRAM_GRAPH_VERSION: z.string().optional().default("v24.0"),
-  INSTAGRAM_ACCOUNT_ID: z.string().optional().default(""),
-
   // Marca da instalação (white-label) — ver lib/branding.ts.
   // Sem prefixo NEXT_PUBLIC_ de propósito: essas seriam queimadas no bundle
   // durante o build da imagem, e o self-hoster roda uma imagem pré-buildada.

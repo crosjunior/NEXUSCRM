@@ -39,25 +39,25 @@ export default async function WelcomePage() {
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-            <span>✨ Recomendado · Zero Fricção</span>
+            <span>{traduzir("✨ Recomendado · Zero Fricção", idioma)}</span>
           </div>
-          <h3 className="font-semibold text-base">Configurar Tudo com o Assistente de IA</h3>
+          <h3 className="font-semibold text-base">{traduzir("Configurar Tudo com o Assistente de IA", idioma)}</h3>
           <p className="text-xs text-muted-foreground max-w-lg">
-            Envie apenas seus arquivos (PDF, tabelas, panfletos), links de site ou redes sociais e a IA configura seu agente, tom de voz, catálogo e funil automaticamente em 60 segundos.
+            {traduzir("Envie apenas seus arquivos (PDF, tabelas, panfletos), links de site ou redes sociais e a IA configura seu agente, tom de voz, catálogo e funil automaticamente em 60 segundos.", idioma)}
           </p>
         </div>
         <a
           href="/onboarding/autonomo"
           className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-9 px-4 py-2 shrink-0 transition-colors gap-2"
         >
-          <span>Usar Assistente Autônomo</span>
+          <span>{traduzir("Usar Assistente Autônomo", idioma)}</span>
           <span>→</span>
         </a>
       </div>
 
       {/* Ou continuar configuração manual */}
       <div className="relative my-2 text-center text-xs text-muted-foreground">
-        <span className="bg-background px-2 relative z-10">ou configure manualmente passo a passo</span>
+        <span className="bg-background px-2 relative z-10">{traduzir("ou configure manualmente passo a passo", idioma)}</span>
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t border-border" />
         </div>

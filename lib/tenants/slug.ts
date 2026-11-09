@@ -2,6 +2,7 @@
  * Utilitários de normalização e resolução de slug de organizações (Tenants).
  */
 
+import { ehOperante, STATUS_OPERANTE } from "@/lib/organizacao/operante";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isReservedSlug, slugifyEmpresa } from "./slug-pure";
 
@@ -33,8 +34,8 @@ export async function resolveOrganizationBySlug(
   // Busca exata pelo slug ou ignorando hífens
   const { data: orgs, error } = await admin
     .from("organizations")
-    .select("id, slug, display_name, legal_name, timezone, settings")
-    .eq("status", "active")
+    .select("id, slug, display_name, legal_name, timezone, status, settings")
+    .eq("status", STATUS_OPERANTE)
     .limit(10);
 
   if (error || !orgs || orgs.length === 0) return null;
@@ -42,6 +43,7 @@ export async function resolveOrganizationBySlug(
   // Encontra a organização compatível
   const slugLimpo = slug.replace(/[^a-z0-9]/g, "");
   const correspondente = orgs.find((o) => {
+    if (!ehOperante(o.status)) return false;
     const oSlug = (o.slug || "").toLowerCase();
     const oSlugLimpo = oSlug.replace(/[^a-z0-9]/g, "");
     return (

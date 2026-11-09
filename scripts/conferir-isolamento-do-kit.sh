@@ -83,6 +83,13 @@ fi
 if [ -z "$release" ]; then
   release="$(cd "$ROOT" && bash -c 'source "$1/_common.sh" >/dev/null 2>&1; ultima_release_estavel' _ "$KIT" || true)"
 fi
+if [ -z "$release" ] && [ -n "${GH_TOKEN:-}" ] && command -v gh >/dev/null 2>&1; then
+  release="$(gh release view -R melgarafael/DeskcommCRM --json tagName -q .tagName 2>/dev/null || true)"
+  [ -n "$release" ] && origem_das_tags="https://github.com/melgarafael/DeskcommCRM.git"
+fi
+if [ -z "$release" ]; then
+  release="$(git -C "$ROOT" tag -l 'v[0-9]*' --sort=-v:refname 2>/dev/null | head -n 1 || true)"
+fi
 case "$release" in
   v[0-9]*) ;;
   *) echo "FATAL: não consegui saber qual é a última release publicada (sem rede? API fora?)." >&2

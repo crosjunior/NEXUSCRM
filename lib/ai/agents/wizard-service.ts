@@ -389,6 +389,7 @@ export async function salvarEPublicarAgenteWizard(params: {
       model: "gemini-3.5-flash",
       credential_id: credentialId,
       tool_ids: blueprint.suggestedTools,
+      trigger_config: undefined,
       channel_session_id: input.channelSessionId,
       max_steps: 10,
       token_budget: 10000,
@@ -403,6 +404,14 @@ export async function salvarEPublicarAgenteWizard(params: {
       split_messages: input.guardrails.splitMessages,
       split_max_chars: 280,
       inbound_debounce_ms: 3000,
+      followup: {
+        enabled: false,
+        flow_pointer_ids: [],
+        send_window: null,
+      },
+      operator_enabled: false,
+      operator_model: null,
+      operator_tool_ids: [],
       pipeline_ids: input.pipelineIds,
       knowledge_source_ids: input.knowledgeSourceIds,
       status: "draft",
@@ -413,7 +422,11 @@ export async function salvarEPublicarAgenteWizard(params: {
 
   if (versionErr || !versionRow) {
     // Limpa agente se falhar a versão
-    await admin.from("ai_agents").delete().eq("id", agentRow.id);
+    await admin
+      .from("ai_agents")
+      .delete()
+      .eq("id", agentRow.id)
+      .eq("organization_id", organizationId);
     return { ok: false, error: versionErr?.message || "Erro ao criar versão inicial" };
   }
 

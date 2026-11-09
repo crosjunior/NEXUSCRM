@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { requireRole } from "@/lib/auth/require-role";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { ok, fail } from "@/lib/api/wrappers";
 import { extractPdfText } from "@/lib/ai/rag/extractors/pdf";
 
@@ -11,6 +12,9 @@ export async function POST(req: NextRequest) {
   // Autorização canônica: apenas admin da organização
   const authz = await requireRole("admin", { requestId, resource: "onboarding.autonomous" });
   if (!authz.ok) return authz.response;
+
+  const supportBlock = await requireSupportWrite(authz.org.orgId);
+  if (supportBlock) return supportBlock;
 
   try {
     const formData = await req.formData();

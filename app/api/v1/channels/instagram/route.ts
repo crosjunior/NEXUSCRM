@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth/require-role";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { env } from "@/lib/env";
 import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
+import { fecharAvisoDePausaDoCanalArquivado } from "@/lib/channels/central-de-pausa";
 import { resolveInstagramCreds } from "@/lib/channels/instagram/credentials";
 import { buildAuthorizeUrl, listInstagramMedia } from "@/lib/channels/instagram/api";
+import { getInstagramChannelSession } from "@/lib/channels/instagram/service";
 import { SOCIAL_PROVIDER } from "@/lib/channels/social/catalog";
 import type {
   InstagramFlowGraph,
@@ -170,15 +173,7 @@ export async function GET() {
 
   try {
     // 1. Busca a sessão do canal do Instagram desta organização
-    const { data: session } = await db
-      .from("channel_sessions")
-      .select(
-        "id, display_name, status, zernio_account_id, meta_token_encrypted, metadata, created_at, updated_at",
-      )
-      .eq("organization_id", orgId)
-      .eq("provider", SOCIAL_PROVIDER)
-      .is("archived_at", null)
-      .maybeSingle();
+    const session = await getInstagramChannelSession(db, orgId);
 
     const metadata = (session?.metadata ?? {}) as Record<string, unknown>;
     const isDirectMeta = metadata.direct_meta === true;
@@ -194,14 +189,14 @@ export async function GET() {
     // 3. Resolve as credenciais (tenant ou fallback)
     const creds = await resolveInstagramCreds(db, orgId);
 
-    const appUrl = (env.NEXT_PUBLIC_APP_URL || "https://crm.nexusia.work").replace(/\/$/, "");
+    const appUrl = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
     const webhookUrl = `${appUrl}/api/v1/webhooks/instagram`;
 
     const account =
       session && isDirectMeta
         ? {
             id: session.id,
-            accountId: session.zernio_account_id || String(metadata.ig_user_id || ""),
+            accountId: session.accountId,
             username:
               (metadata.username as string) ||
               session.display_name?.replace(/^Instagram · @/, "").replace(/^@/, "") ||
@@ -276,6 +271,8 @@ export async function POST(req: Request) {
   if (!auth.ok) return auth.response;
 
   const orgId = auth.org.orgId;
+  const supportBlock = await requireSupportWrite(orgId);
+  if (supportBlock) return supportBlock;
   const db = createAdminClient();
 
   let body: unknown;
@@ -298,7 +295,7 @@ export async function POST(req: Request) {
     // -----------------------------------------------------------------------
     if (payload.action === "get_connect_url") {
       const creds = await resolveInstagramCreds(db, orgId);
-      const appUrl = (env.NEXT_PUBLIC_APP_URL || "https://crm.nexusia.work").replace(/\/$/, "");
+      const appUrl = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
       const redirectUri = `${appUrl}/api/v1/channels/instagram/callback`;
       const state = Buffer.from(
         JSON.stringify({ org: orgId, uid: auth.user.id, ts: Date.now() }),
@@ -491,15 +488,21 @@ export async function POST(req: Request) {
         .maybeSingle();
 
       if (session) {
+        const now = new Date().toISOString();
         await db
           .from("channel_sessions")
           .update({
-            archived_at: new Date().toISOString(),
+            archived_at: now,
             status: "STOPPED",
-            updated_at: new Date().toISOString(),
+            updated_at: now,
           })
           .eq("id", session.id)
           .eq("organization_id", orgId);
+
+        await fecharAvisoDePausaDoCanalArquivado(db, {
+          id: session.id,
+          organization_id: orgId,
+        });
 
         await audit({
           action: "channel.archived",

@@ -2,12 +2,14 @@ import { redirect } from "next/navigation";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { obterContextoOrganizacao } from "@/lib/ai/agents/wizard-service";
+import { getT } from "@/lib/i18n/server";
 import { AgentWizard } from "./AgentWizard";
 import { Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgentWizardPage() {
+  const t = await getT();
   const user = await requireAuth();
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
@@ -23,14 +25,13 @@ export default async function AgentWizardPage() {
       <header className="flex flex-col gap-1.5">
         <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-emerald-400">
           <Sparkles className="h-4 w-4" />
-          Assistente Inteligente NexusCRMAgent
+          {t("Assistente Inteligente de IA")}
         </div>
         <h1 className="text-2xl font-bold tracking-tight">
-          Criar Agente de Atendimento com IA
+          {t("Criar Agente de Atendimento com IA")}
         </h1>
         <p className="text-sm text-muted-foreground max-w-2xl">
-          Configure seu atendente para WhatsApp e Instagram em poucos minutos. A inteligência artificial
-          analisa seus materiais e deixa tudo pronto e parametrizado para responder seus clientes.
+          {t("Configure seu atendente para WhatsApp e Instagram em poucos minutos. A inteligência artificial analisa seus materiais e deixa tudo pronto e parametrizado para responder seus clientes.")}
         </p>
       </header>
 

@@ -10,13 +10,13 @@ import {
   getInstagramMe,
   subscribeInstagramWebhooks,
 } from "@/lib/channels/instagram/api";
-import { SOCIAL_PROVIDER } from "@/lib/channels/social/catalog";
+import { upsertInstagramChannelSession } from "@/lib/channels/instagram/service";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const p = req.nextUrl.searchParams;
-  const appUrl = (env.NEXT_PUBLIC_APP_URL || "https://crm.nexusia.work").replace(/\/$/, "");
+  const appUrl = env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
 
   const back = (msg: string, ok = false) =>
     NextResponse.redirect(
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
     const long = await toLongLivedToken(creds, short.accessToken);
 
     // 3. Obtém informações da conta do Instagram
-    const fallbackId = env.INSTAGRAM_ACCOUNT_ID || "17841400338102802";
+    const fallbackId = process.env.INSTAGRAM_ACCOUNT_ID || "17841400338102802";
     const me = await getInstagramMe(creds, long.access_token, fallbackId);
 
     // 4. Inscreve os webhooks para receber mensagens e comentários
@@ -73,55 +73,25 @@ export async function GET(req: NextRequest) {
       throw new Error("Não foi possível cifrar o token de acesso.");
     }
 
-    // 6. Verifica se já existe sessão desta conta para esta organização
-    const { data: existing } = await db
-      .from("channel_sessions")
-      .select("id, metadata")
-      .eq("organization_id", state.org)
-      .eq("provider", SOCIAL_PROVIDER)
-      .eq("zernio_account_id", me.id)
-      .is("archived_at", null)
-      .maybeSingle();
-
-    const prevMetadata = (existing?.metadata ?? {}) as Record<string, unknown>;
-    const updatedMetadata = {
-      ...prevMetadata,
-      platform: "instagram",
-      social_platform: "instagram",
-      direct_meta: true,
+    // 6. Cria ou atualiza a sessão do canal para esta organização
+    await upsertInstagramChannelSession(db, {
+      orgId: state.org,
+      userId: state.uid,
+      accountId: me.id,
       username: me.username,
-      name: me.name || me.username,
-      ig_user_id: me.id,
-      access_token: long.access_token,
-      profile_picture_url: me.profile_picture_url || null,
-      token_expires_at: new Date(Date.now() + long.expires_in * 1000).toISOString(),
-    };
-
-    if (existing) {
-      await db
-        .from("channel_sessions")
-        .update({
-          display_name: `Instagram · @${me.username}`,
-          status: "WORKING",
-          meta_token_encrypted: encryptedToken,
-          metadata: updatedMetadata,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-    } else {
-      await db.from("channel_sessions").insert({
-        organization_id: state.org,
-        provider: SOCIAL_PROVIDER,
-        waha_session_name: `ig_direct_${state.org.slice(0, 8)}_${me.id.slice(-6)}`,
-        webhook_secret_encrypted: encryptedToken,
-        zernio_account_id: me.id,
-        display_name: `Instagram · @${me.username}`,
-        status: "WORKING",
-        meta_token_encrypted: encryptedToken,
-        metadata: updatedMetadata,
-        created_by: state.uid,
-      });
-    }
+      encryptedToken,
+      metadata: {
+        platform: "instagram",
+        social_platform: "instagram",
+        direct_meta: true,
+        username: me.username,
+        name: me.name || me.username,
+        ig_user_id: me.id,
+        access_token: long.access_token,
+        profile_picture_url: me.profile_picture_url || null,
+        token_expires_at: new Date(Date.now() + long.expires_in * 1000).toISOString(),
+      },
+    });
 
     return back(`@${me.username} conectado com sucesso!`, true);
   } catch (err) {
