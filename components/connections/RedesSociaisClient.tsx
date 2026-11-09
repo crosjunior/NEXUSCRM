@@ -24,6 +24,7 @@ import { canalDesativado } from "@/lib/channels/desativado";
 import { useT } from "@/hooks/i18n/useT";
 import { ChannelAiAccess } from "./ChannelAiAccess";
 import { RenomearConexao } from "./RenomearConexao";
+import { InstagramDirectCard } from "./InstagramDirectCard";
 
 type Account = {
   id: string;
@@ -224,6 +225,9 @@ export function RedesSociaisClient() {
           {t("Reconfigurar integração")}
         </Button>
       )}
+      {/* Conexão Direta Oficial com o Instagram (Meta Graph API) */}
+      <InstagramDirectCard />
+
       {((state && !state.configured) || editing) && (
         <Card className="space-y-4 p-4">
           <h3 className="font-semibold">{t("Vincular o provedor")}</h3>

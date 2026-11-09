@@ -9,6 +9,9 @@ import { zernioCredsForAccountId } from "../zernio/credentials";
 import { socialMessageId, SOCIAL_PROVIDER } from "./catalog";
 import { socialRequest } from "./client";
 import type { ChannelAdapter } from "../types";
+import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
+import { resolveInstagramCreds } from "../instagram/credentials";
+import { sendInstagramMessage, getInstagramMe } from "../instagram/api";
 
 export const socialAdapter: ChannelAdapter = {
   ...zernioAdapter,
@@ -20,13 +23,34 @@ export const socialAdapter: ChannelAdapter = {
     const db = createAdminClient();
     const { data } = await db
       .from("channel_sessions")
-      .select("metadata")
+      .select("metadata, meta_token_encrypted")
       .eq("organization_id", input.organizationId)
       .eq("provider", SOCIAL_PROVIDER)
       .eq("zernio_account_id", input.sessionRef)
       .is("archived_at", null)
       .maybeSingle();
-    if (!(data?.metadata as Record<string, unknown>)?.social_webhook_id)
+
+    const metadata = (data?.metadata ?? {}) as Record<string, unknown>;
+
+    // Conexão Direta Oficial com a Meta (Instagram Direct)
+    if (metadata.direct_meta === true) {
+      if (!data?.meta_token_encrypted) {
+        return { reachable: true, status: "FAILED", detail: "credencial_indisponivel" };
+      }
+      const token = await decryptWebhookSecret(db, data.meta_token_encrypted as string);
+      if (!token) {
+        return { reachable: true, status: "FAILED", detail: "falha_decifrar_token" };
+      }
+      try {
+        const creds = await resolveInstagramCreds(db, input.organizationId);
+        await getInstagramMe(creds, token, input.sessionRef);
+        return { reachable: true, status: "WORKING", detail: null };
+      } catch {
+        return { reachable: true, status: "FAILED", detail: "token_meta_invalido" };
+      }
+    }
+
+    if (!metadata.social_webhook_id)
       return { reachable: true, status: "FAILED", detail: "recebimento_nao_configurado" };
     const creds = await zernioCredsForAccountId(db, {
       organizationId: input.organizationId,
@@ -106,7 +130,53 @@ export const socialAdapter: ChannelAdapter = {
       throw new Error("Aguarde uma mensagem do cliente para responder nesta rede.");
     if (!["text", "image", "video", "audio"].includes(envelope.kind))
       throw new Error("Este tipo de mensagem ainda não é suportado nesta rede.");
-    const creds = await zernioCredsForAccountId(createAdminClient(), {
+
+    const db = createAdminClient();
+    const { data: session } = await db
+      .from("channel_sessions")
+      .select("metadata, meta_token_encrypted")
+      .eq("organization_id", envelope.organizationId)
+      .eq("provider", SOCIAL_PROVIDER)
+      .eq("zernio_account_id", envelope.sessionRef)
+      .is("archived_at", null)
+      .maybeSingle();
+
+    const metadata = (session?.metadata ?? {}) as Record<string, unknown>;
+
+    // Envio Direto via Meta Graph API (Instagram Direct)
+    if (metadata.direct_meta === true) {
+      if (!session?.meta_token_encrypted) {
+        throw new Error("Credencial oficial da Meta ausente na sessão.");
+      }
+      const token = await decryptWebhookSecret(db, session.meta_token_encrypted as string);
+      if (!token) throw new Error("Falha ao decifrar o token oficial da Meta.");
+
+      await envelope.beforeSend?.();
+      const creds = await resolveInstagramCreds(db, envelope.organizationId);
+
+      // Extrai o identificador do destinatário
+      let recipientId = envelope.providerConversationId;
+      if (recipientId.startsWith("ig_")) {
+        const parts = recipientId.split("_");
+        if (parts[1]) recipientId = parts[1];
+      }
+
+      const bodyText = envelope.media?.caption
+        ? `${envelope.media.caption}\n${envelope.media.url}`
+        : envelope.body ?? "";
+
+      const res = await sendInstagramMessage(
+        creds,
+        token,
+        { id: recipientId },
+        bodyText,
+        { igUserId: envelope.sessionRef },
+      );
+
+      return { externalId: socialMessageId(envelope.sessionRef, res.message_id) };
+    }
+
+    const creds = await zernioCredsForAccountId(db, {
       organizationId: envelope.organizationId,
       accountId: envelope.sessionRef,
     });

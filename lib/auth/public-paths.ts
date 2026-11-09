@@ -26,6 +26,8 @@ export const PUBLIC_PATHS: RegExp[] = [
   // Retorno de OAuth social: documento público sem efeitos que reconecta a
   // navegação interna para manter os cookies de sessão sob SameSite=Strict.
   /^\/auth\/social-return$/,
+  // Retorno de OAuth direto da Meta (Instagram / Facebook Login for Business)
+  /^\/api\/v1\/channels\/instagram\/callback$/,
   // Volta do provedor de pagamento (checkout, portal): mesma natureza da linha
   // acima — vem de outro site, o cookie Strict não viaja, e a rota é só a ponte
   // para um destino FIXO (`app/cobranca/volta/route.ts`), sem efeito.
