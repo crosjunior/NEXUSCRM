@@ -1,4 +1,4 @@
-import type { InstagramKeywordRule } from "./types";
+import type { FlowStartData, InstagramKeywordRule } from "./types";
 
 /** Normaliza: minúsculas, sem acento, espaços colapsados */
 export function normalizeText(s: string): string {
@@ -64,9 +64,32 @@ export function findMatchingRule(
   const candidates = rules
     .filter((r) => {
       if (!r.active) return false;
-      const ruleType = r.type || (r as unknown as { trigger_type?: string }).trigger_type || "comment_keyword";
-      if (ruleType !== type) return false;
       if (!isRuleWithinSchedule(r, now)) return false;
+
+      // Em modo visual, um fluxo pode ter múltiplos gatilhos no nó Início (ex: comment_keyword + dm_keyword)
+      if (r.mode === "visual" && r.flow_graph?.nodes?.length) {
+        const startNode = r.flow_graph.nodes.find((n) => n.type === "start");
+        const startData = startNode?.data as FlowStartData | undefined;
+        const matchedTrig = (startData?.triggers ?? []).some((trig) => {
+          const mappedType =
+            trig.type === "story_reply" || trig.type === "story_mention"
+              ? "story_mention"
+              : trig.type === "dm_keyword" || trig.type === "default_reply"
+              ? "dm_keyword"
+              : "comment_keyword";
+          if (mappedType !== type) return false;
+          const trigMedia = trig.mediaId?.trim() || r.media_id?.trim();
+          if (trigMedia && trigMedia !== "all") {
+            if (!targetMediaId || trigMedia !== targetMediaId) return false;
+          }
+          return true;
+        });
+        if (matchedTrig) return true;
+      }
+
+      const ruleType =
+        r.type || (r as unknown as { trigger_type?: string }).trigger_type || "comment_keyword";
+      if (ruleType !== type) return false;
 
       // Se a regra exige um Post/Reels/Story específico, valida o media_id
       const ruleMediaId = r.media_id?.trim();
@@ -85,8 +108,31 @@ export function findMatchingRule(
     });
 
   for (const rule of candidates) {
+    if (rule.mode === "visual" && rule.flow_graph?.nodes?.length) {
+      const startNode = rule.flow_graph.nodes.find((n) => n.type === "start");
+      const startData = startNode?.data as FlowStartData | undefined;
+      for (const trig of startData?.triggers ?? []) {
+        const mappedType =
+          trig.type === "story_reply" || trig.type === "story_mention"
+            ? "story_mention"
+            : trig.type === "dm_keyword" || trig.type === "default_reply"
+            ? "dm_keyword"
+            : "comment_keyword";
+        if (mappedType !== type) continue;
+        if (trig.type === "default_reply" || trig.match === "any") return rule;
+        if (type === "story_mention" && (!trig.keywords || trig.keywords.length === 0)) {
+          return rule;
+        }
+        const mMode = trig.match === "exact" ? "exact" : "contains";
+        if (matchesKeywords(text, trig.keywords ?? [], mMode)) {
+          return rule;
+        }
+      }
+    }
+
     const matchMode =
-      rule.match || ((rule as unknown as { match_type?: "contains" | "exact" }).match_type ?? "contains");
+      rule.match ||
+      ((rule as unknown as { match_type?: "contains" | "exact" }).match_type ?? "contains");
 
     // Em story_mention, se não houver palavras-chave definidas, dispara para qualquer menção/resposta no story
     if (type === "story_mention" && (!rule.keywords || rule.keywords.length === 0)) {

@@ -31,6 +31,7 @@ interface MetaWebhookEntry {
       mid: string;
       text?: string;
       is_echo?: boolean;
+      quick_reply?: { payload?: string };
       reply_to?: { story?: { id: string; url?: string } };
       attachments?: Array<{ type: string; payload?: { url?: string } }>;
     };
@@ -99,6 +100,7 @@ export function normalizeInstagramWebhook(body: MetaWebhookPayload): NormalizedI
             senderId,
             recipientId,
             text: m.message.text,
+            quickReplyPayload: m.message.quick_reply?.payload,
             isEcho: Boolean(m.message.is_echo),
             storyReply,
             storyMention: isStoryMention,

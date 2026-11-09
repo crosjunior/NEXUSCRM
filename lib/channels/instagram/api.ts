@@ -1,6 +1,7 @@
 import { logger } from "@/lib/logger";
 import type { ResolvedInstagramCreds } from "./credentials";
 import type { InstagramAccountInfo, InstagramMediaItem } from "./types";
+import { encodeFlowPayload, type FlowOutboundMessage } from "./flow-engine";
 
 export const IG_SCOPES = [
   "instagram_business_basic",
@@ -333,12 +334,53 @@ export async function subscribeInstagramWebhooks(
   );
 }
 
-/** Envia mensagem direta (DM) no Instagram */
-export async function sendInstagramMessage(
+/** Converte uma mensagem do motor de fluxo visual no payload da Graph API da Meta (botões, respostas rápidas, imagem, texto) */
+export function buildGraphMessagePayload(
+  m: FlowOutboundMessage,
+  ruleId: string,
+  nodeId: string,
+): Record<string, unknown> {
+  if (m.imageUrl && !m.text) {
+    return { attachment: { type: "image", payload: { url: m.imageUrl } } };
+  }
+  const text = (m.text ?? "").slice(0, 1000);
+  const quick_replies = m.quickReplies?.map((q) => ({
+    content_type: "text",
+    title: q.title.slice(0, 20),
+    payload: encodeFlowPayload(ruleId, nodeId, q.id),
+  }));
+
+  if (m.buttons?.length) {
+    return {
+      attachment: {
+        type: "template",
+        payload: {
+          template_type: "button",
+          text: text.slice(0, 640),
+          buttons: m.buttons.slice(0, 3).map((b) =>
+            b.type === "url"
+              ? { type: "web_url", url: b.url, title: b.title.slice(0, 20) }
+              : {
+                  type: "postback",
+                  title: b.title.slice(0, 20),
+                  payload: encodeFlowPayload(ruleId, nodeId, b.id),
+                },
+          ),
+        },
+      },
+      ...(quick_replies?.length ? { quick_replies } : {}),
+    };
+  }
+
+  return { text, ...(quick_replies?.length ? { quick_replies } : {}) };
+}
+
+/** Envia mensagem rica (com botões, quick replies ou imagem) no Direct do Instagram */
+export async function sendInstagramRichMessage(
   creds: ResolvedInstagramCreds,
   token: string,
   recipient: { id: string } | { comment_id: string },
-  text: string,
+  messagePayload: Record<string, unknown>,
   opts: { igUserId?: string; humanAgent?: boolean } = {},
 ): Promise<{ message_id: string }> {
   const url =
@@ -351,10 +393,27 @@ export async function sendInstagramMessage(
     token,
     body: JSON.stringify({
       recipient,
-      message: { text: text.slice(0, 1000) },
+      message: messagePayload,
       ...(opts.humanAgent ? { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" } : {}),
     }),
   });
+}
+
+/** Envia mensagem direta (DM) no Instagram */
+export async function sendInstagramMessage(
+  creds: ResolvedInstagramCreds,
+  token: string,
+  recipient: { id: string } | { comment_id: string },
+  text: string,
+  opts: { igUserId?: string; humanAgent?: boolean } = {},
+): Promise<{ message_id: string }> {
+  return sendInstagramRichMessage(
+    creds,
+    token,
+    recipient,
+    { text: text.slice(0, 1000) },
+    opts,
+  );
 }
 
 /** Responde publicamente a um comentário em um post/Reel */
@@ -374,19 +433,37 @@ export async function replyToInstagramComment(
   );
 }
 
-/** Obtém o perfil público de um usuário (username, nome, foto) pelo IGSID */
+export interface InstagramUserProfileInfo {
+  username?: string;
+  name?: string;
+  profile_pic?: string;
+  follower_count?: number;
+  is_user_follow_business?: boolean;
+  is_business_follow_user?: boolean;
+  is_verified_user?: boolean;
+}
+
+/** Obtém o perfil público de um usuário (username, nome, foto, status de seguidor) pelo IGSID */
 export async function getInstagramUserProfile(
   creds: ResolvedInstagramCreds,
   token: string,
   igsid: string,
-): Promise<{ username?: string; name?: string; profile_pic?: string } | null> {
+): Promise<InstagramUserProfileInfo | null> {
+  const baseHost = creds.configId ? "https://graph.facebook.com" : "https://graph.instagram.com";
   try {
-    return await call<{ username?: string; name?: string; profile_pic?: string }>(
-      `https://graph.facebook.com/${creds.graphVersion}/${igsid}?fields=name,username,profile_pic`,
+    return await call<InstagramUserProfileInfo>(
+      `${baseHost}/${creds.graphVersion}/${igsid}?fields=name,username,profile_pic,follower_count,is_user_follow_business,is_business_follow_user,is_verified_user`,
       { token },
     );
   } catch {
-    return null;
+    try {
+      return await call<InstagramUserProfileInfo>(
+        `https://graph.facebook.com/${creds.graphVersion}/${igsid}?fields=name,username,profile_pic`,
+        { token },
+      );
+    } catch {
+      return null;
+    }
   }
 }
 

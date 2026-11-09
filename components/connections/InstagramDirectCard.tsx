@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { BarChart3, Workflow, SlidersHorizontal, MessageCircle, Send, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,18 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api/client";
 import { useT } from "@/hooks/i18n/useT";
-import type { InstagramKeywordRule, InstagramMediaItem } from "@/lib/channels/instagram/types";
+import {
+  buildManyChatDefaultGraph,
+  extractRuleSummaryFromGraph,
+} from "@/lib/channels/instagram/flow-engine";
+import type {
+  InstagramFlowGraph,
+  InstagramKeywordRule,
+  InstagramMediaItem,
+  InstagramRuleExecutionLog,
+} from "@/lib/channels/instagram/types";
+import { InstagramVisualFlowBuilder } from "./InstagramVisualFlowBuilder";
+import { InstagramRuleMetricsModal } from "./InstagramRuleMetricsModal";
 
 interface InstagramState {
   connected: boolean;
@@ -26,6 +38,7 @@ interface InstagramState {
   } | null;
   agent_id: string | null;
   keyword_rules: InstagramKeywordRule[];
+  rule_executions?: InstagramRuleExecutionLog[];
   media_items: InstagramMediaItem[];
   available_agents: Array<{
     id: string;
@@ -97,6 +110,7 @@ export function InstagramDirectCard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
+  const [metricsRuleId, setMetricsRuleId] = useState<string | null>(null);
 
   // Estado do dropdown visual de publicações (Post, Reels, Story)
   const [isMediaDropdownOpen, setIsMediaDropdownOpen] = useState(false);
@@ -104,6 +118,7 @@ export function InstagramDirectCard() {
 
   const [ruleForm, setRuleForm] = useState<{
     name: string;
+    mode: "basic" | "visual";
     type: InstagramKeywordRule["type"];
     match: "contains" | "exact";
     rawKeywords: string;
@@ -118,8 +133,10 @@ export function InstagramDirectCard() {
     starts_at: string;
     ends_at: string;
     active: boolean;
+    flow_graph: InstagramFlowGraph;
   }>({
     name: "",
+    mode: "basic",
     type: "comment_keyword",
     match: "contains",
     rawKeywords: "quero, link, preco",
@@ -134,6 +151,7 @@ export function InstagramDirectCard() {
     starts_at: "",
     ends_at: "",
     active: true,
+    flow_graph: buildManyChatDefaultGraph(),
   });
 
   const { data: state, isLoading } = useQuery<InstagramState>({
@@ -208,10 +226,27 @@ export function InstagramDirectCard() {
     },
   });
 
-  function openNewRuleForm() {
+  const clearLogsMutation = useMutation({
+    mutationFn: async (ruleId: string) => {
+      await apiClient.post("/api/v1/channels/instagram", {
+        action: "clear_rule_logs",
+        rule_id: ruleId,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Histórico de indicadores zerado com sucesso.");
+      void queryClient.invalidateQueries({ queryKey: ["instagram-direct-state"] });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Falha ao limpar indicadores.");
+    },
+  });
+
+  function openNewRuleForm(initialMode: "basic" | "visual" = "basic") {
     setEditingRuleId(null);
     setRuleForm({
       name: "",
+      mode: initialMode,
       type: "comment_keyword",
       match: "contains",
       rawKeywords: "quero, link, preco",
@@ -226,6 +261,10 @@ export function InstagramDirectCard() {
       starts_at: "",
       ends_at: "",
       active: true,
+      flow_graph: buildManyChatDefaultGraph({
+        keywords: ["quero", "link"],
+        publicReply: "Te enviei no direct! Dá uma olhada 🚀",
+      }),
     });
     setIsMediaDropdownOpen(false);
     setIsFormOpen(true);
@@ -233,8 +272,19 @@ export function InstagramDirectCard() {
 
   function openEditRuleForm(rule: InstagramKeywordRule) {
     setEditingRuleId(rule.id);
+    const defaultGraph =
+      rule.flow_graph && rule.flow_graph.nodes?.length > 0
+        ? rule.flow_graph
+        : buildManyChatDefaultGraph({
+            keywords: rule.keywords,
+            publicReply: rule.public_reply || undefined,
+            dmMessage: rule.dm_message,
+            mediaId: rule.media_id,
+          });
+
     setRuleForm({
       name: rule.name || "",
+      mode: rule.mode === "visual" ? "visual" : "basic",
       type: rule.type || "comment_keyword",
       match: rule.match || "contains",
       rawKeywords: (rule.keywords || []).join(", "),
@@ -249,6 +299,7 @@ export function InstagramDirectCard() {
       starts_at: toDatetimeLocalValue(rule.starts_at),
       ends_at: toDatetimeLocalValue(rule.ends_at),
       active: rule.active !== false,
+      flow_graph: defaultGraph,
     });
     setIsMediaDropdownOpen(false);
     setIsFormOpen(true);
@@ -278,6 +329,67 @@ export function InstagramDirectCard() {
   }
 
   function handleSaveRule() {
+    if (!ruleForm.is_permanent && ruleForm.starts_at && ruleForm.ends_at) {
+      if (new Date(ruleForm.starts_at).getTime() >= new Date(ruleForm.ends_at).getTime()) {
+        toast.error("A data/hora de fim deve ser posterior à data/hora de início.");
+        return;
+      }
+    }
+
+    const startsIso =
+      !ruleForm.is_permanent && ruleForm.starts_at
+        ? new Date(ruleForm.starts_at).toISOString()
+        : null;
+    const endsIso =
+      !ruleForm.is_permanent && ruleForm.ends_at
+        ? new Date(ruleForm.ends_at).toISOString()
+        : null;
+
+    const allMediaItems = state?.media_items || [];
+
+    if (ruleForm.mode === "visual") {
+      const summary = extractRuleSummaryFromGraph(ruleForm.flow_graph);
+      const chosenMediaId =
+        ruleForm.media_id && ruleForm.media_id !== "all"
+          ? ruleForm.media_id
+          : summary.media_id;
+      const matchedMedia = chosenMediaId
+        ? allMediaItems.find((m) => m.id === chosenMediaId)
+        : null;
+
+      const ruleToSave: InstagramKeywordRule = {
+        id: editingRuleId || `rule_${Date.now()}`,
+        name: ruleForm.name.trim() || "Fluxo Visual Instagram",
+        mode: "visual",
+        type: summary.type,
+        keywords: summary.keywords,
+        match: summary.match,
+        public_reply: summary.public_reply,
+        dm_message: summary.dm_message,
+        active: ruleForm.active,
+        media_id: chosenMediaId || null,
+        media_caption_preview:
+          matchedMedia?.caption_preview || ruleForm.media_caption_preview || null,
+        media_thumbnail_url:
+          matchedMedia?.preview_url || ruleForm.media_thumbnail_url || null,
+        media_product_type:
+          matchedMedia?.media_product_type || ruleForm.media_product_type || null,
+        media_permalink: matchedMedia?.permalink || ruleForm.media_permalink || null,
+        is_permanent: ruleForm.is_permanent,
+        starts_at: startsIso,
+        ends_at: endsIso,
+        flow_graph: ruleForm.flow_graph,
+      };
+
+      const currentRules = state?.keyword_rules || [];
+      const nextRules = editingRuleId
+        ? currentRules.map((r) => (r.id === editingRuleId ? { ...ruleToSave, stats: r.stats } : r))
+        : [...currentRules, ruleToSave];
+
+      saveRulesMutation.mutate(nextRules);
+      return;
+    }
+
     const list = ruleForm.rawKeywords
       .split(",")
       .map((k) => k.trim())
@@ -288,26 +400,12 @@ export function InstagramDirectCard() {
       return;
     }
 
-    if (!ruleForm.is_permanent && ruleForm.starts_at && ruleForm.ends_at) {
-      if (new Date(ruleForm.starts_at).getTime() >= new Date(ruleForm.ends_at).getTime()) {
-        toast.error("A data/hora de fim deve ser posterior à data/hora de início.");
-        return;
-      }
-    }
-
     const isSpecificMedia = ruleForm.media_id && ruleForm.media_id !== "all";
-    const startsIso =
-      !ruleForm.is_permanent && ruleForm.starts_at
-        ? new Date(ruleForm.starts_at).toISOString()
-        : null;
-    const endsIso =
-      !ruleForm.is_permanent && ruleForm.ends_at
-        ? new Date(ruleForm.ends_at).toISOString()
-        : null;
 
     const ruleToSave: InstagramKeywordRule = {
       id: editingRuleId || `rule_${Date.now()}`,
       name: ruleForm.name.trim() || null,
+      mode: "basic",
       type: ruleForm.type,
       keywords: list,
       match: ruleForm.match,
@@ -322,11 +420,12 @@ export function InstagramDirectCard() {
       is_permanent: ruleForm.is_permanent,
       starts_at: startsIso,
       ends_at: endsIso,
+      flow_graph: null,
     };
 
     const currentRules = state?.keyword_rules || [];
     const nextRules = editingRuleId
-      ? currentRules.map((r) => (r.id === editingRuleId ? ruleToSave : r))
+      ? currentRules.map((r) => (r.id === editingRuleId ? { ...ruleToSave, stats: r.stats } : r))
       : [...currentRules, ruleToSave];
 
     saveRulesMutation.mutate(nextRules);
@@ -362,6 +461,7 @@ export function InstagramDirectCard() {
   const account = state?.account;
   const isConnected = state?.connected && !!account;
   const allMediaItems = state?.media_items || [];
+  const allExecutions = state?.rule_executions || [];
 
   const filteredMediaItems = allMediaItems.filter((item) => {
     if (mediaFilterType === "ALL") return true;
@@ -379,6 +479,10 @@ export function InstagramDirectCard() {
           timestamp: "",
         }
       : null;
+
+  const activeMetricsRule = metricsRuleId
+    ? state?.keyword_rules.find((r) => r.id === metricsRuleId) ?? null
+    : null;
 
   return (
     <Card className="space-y-6 p-6 border-primary/20 bg-card/60 backdrop-blur-sm">
@@ -496,87 +600,151 @@ export function InstagramDirectCard() {
         </div>
       )}
 
-      {/* Automação de Palavras-Chave (ManyChat / NexusReply style) */}
+      {/* Automação de Palavras-Chave (Modo Básico e Modo Visual ManyChat / NexusReply) */}
       {isConnected && (
         <div className="space-y-4 rounded-xl border p-4 bg-muted/10">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h4 className="text-sm font-semibold">{t("Automações de Comentários, Stories e DMs")}</h4>
               <p className="text-xs text-muted-foreground">
-                {t("Crie quantas regras desejar para responder comentários em Posts, Reels ou Stories específicos (ou em qualquer publicação), com vigência permanente ou agendada.")}
+                {t("Crie regras no formato Básico ou no Construtor Visual (estilo ManyChat / NexusReply), escolha Posts/Reels/Stories específicos e acompanhe os indicadores de cada regra.")}
               </p>
             </div>
             {!isFormOpen && (
-              <Button size="sm" variant="outline" onClick={openNewRuleForm}>
-                {t("+ Nova Regra")}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => openNewRuleForm("basic")}>
+                  <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" />
+                  {t("+ Regra Básica")}
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-indigo-600 text-white hover:bg-indigo-700"
+                  onClick={() => openNewRuleForm("visual")}
+                >
+                  <Workflow className="mr-1.5 h-3.5 w-3.5" />
+                  {t("+ Regra Visual (Fluxo)")}
+                </Button>
+              </div>
             )}
           </div>
 
-          {/* Formulário de Criação / Edição de Regra */}
+          {/* Formulário de Criação / Edição de Regra (com alternância Básico vs Visual) */}
           {isFormOpen && (
-            <div className="space-y-4 rounded-lg border bg-background p-4 shadow-sm">
-              <div className="flex items-center justify-between border-b pb-2">
-                <h5 className="text-sm font-semibold">
-                  {editingRuleId ? t("Editar Regra de Automação") : t("Criar Nova Regra de Automação")}
-                </h5>
-                <Badge variant="outline" className="text-xs">
-                  {editingRuleId ? t("Modo Edição") : t("Nova Regra")}
-                </Badge>
-              </div>
-
-              {/* Nome opcional da regra */}
-              <div className="space-y-1.5">
-                <Label htmlFor="rule-name">{t("Nome de identificação da regra (Opcional)")}</Label>
-                <Input
-                  id="rule-name"
-                  value={ruleForm.name}
-                  onChange={(e) => setRuleForm((r) => ({ ...r, name: e.target.value }))}
-                  placeholder="Ex: Promoção Mentoria IA - Reels de Novembro"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="rule-type">{t("Gatilho")}</Label>
-                  <select
-                    id="rule-type"
-                    className="w-full rounded-md border bg-background p-2 text-sm"
-                    value={ruleForm.type}
-                    onChange={(e) => {
-                      const nextType = e.target.value as InstagramKeywordRule["type"];
-                      setRuleForm((r) => ({ ...r, type: nextType }));
-                      if (nextType === "story_mention") {
-                        setMediaFilterType("STORY");
-                      } else {
-                        setMediaFilterType("ALL");
-                      }
-                    }}
-                  >
-                    <option value="comment_keyword">{t("Comentário em Post ou Reels")}</option>
-                    <option value="story_mention">{t("Resposta ou Menção nos Stories")}</option>
-                    <option value="dm_keyword">{t("Palavra-Chave na Mensagem Direta (DM)")}</option>
-                  </select>
+            <div className="space-y-4 rounded-xl border bg-background p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+                <div>
+                  <h5 className="text-sm font-semibold">
+                    {editingRuleId ? t("Editar Regra de Automação") : t("Criar Nova Regra de Automação")}
+                  </h5>
+                  <p className="text-xs text-muted-foreground">
+                    {t("Escolha abaixo entre o formulário rápido (Modo Básico) ou o construtor de blocos com botões, condições e ações (Modo Visual).")}
+                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="rule-match">{t("Tipo de Correspondência")}</Label>
-                  <select
-                    id="rule-match"
-                    className="w-full rounded-md border bg-background p-2 text-sm"
-                    value={ruleForm.match}
-                    onChange={(e) =>
-                      setRuleForm((r) => ({ ...r, match: e.target.value as "contains" | "exact" }))
-                    }
+                {/* Seletor Modo Básico vs Modo Visual */}
+                <div className="flex items-center rounded-lg border bg-muted/50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setRuleForm((r) => ({ ...r, mode: "basic" }))}
+                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                      ruleForm.mode === "basic"
+                        ? "bg-primary text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
                   >
-                    <option value="contains">{t("Contém a palavra (Recomendado)")}</option>
-                    <option value="exact">{t("Mensagem exata")}</option>
-                  </select>
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    {t("Modo Básico")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRuleForm((r) => ({ ...r, mode: "visual" }))}
+                    className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition ${
+                      ruleForm.mode === "visual"
+                        ? "bg-indigo-600 text-white shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Workflow className="h-3.5 w-3.5" />
+                    {t("Modo Visual (ManyChat / NexusReply)")}
+                  </button>
                 </div>
               </div>
 
-              {/* Seletor Visual de Post, Reels ou Story (com miniatura e primeiros 30 caracteres, ordenado do mais novo para o mais antigo) */}
-              {(ruleForm.type === "comment_keyword" || ruleForm.type === "story_mention") && (
+              {/* Campos Comuns: Nome da Regra, Publicação Alvo e Vigência (Permanente vs Agendada) */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="rule-name">{t("Nome de identificação da regra")}</Label>
+                  <Input
+                    id="rule-name"
+                    value={ruleForm.name}
+                    onChange={(e) => setRuleForm((r) => ({ ...r, name: e.target.value }))}
+                    placeholder="Ex: Funil Mentoria IA - Reels de Novembro"
+                  />
+                </div>
+
+                {/* Vigência da Regra: Permanente vs Data e Hora de Início e Fim */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">{t("Vigência da Regra")}</Label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRuleForm((r) => ({ ...r, is_permanent: true }))}
+                      className={`flex-1 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                        ruleForm.is_permanent
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "border bg-background text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {t("Regra Permanente")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRuleForm((r) => ({ ...r, is_permanent: false }))}
+                      className={`flex-1 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                        !ruleForm.is_permanent
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "border bg-background text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {t("Definir Início e Fim")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {!ruleForm.is_permanent && (
+                <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/20 p-3 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="rule-starts-at" className="text-xs">
+                      {t("Data e Hora de Início")}
+                    </Label>
+                    <Input
+                      id="rule-starts-at"
+                      type="datetime-local"
+                      value={ruleForm.starts_at}
+                      onChange={(e) => setRuleForm((r) => ({ ...r, starts_at: e.target.value }))}
+                      className="bg-background text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="rule-ends-at" className="text-xs">
+                      {t("Data e Hora de Fim")}
+                    </Label>
+                    <Input
+                      id="rule-ends-at"
+                      type="datetime-local"
+                      value={ruleForm.ends_at}
+                      onChange={(e) => setRuleForm((r) => ({ ...r, ends_at: e.target.value }))}
+                      className="bg-background text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Seletor Visual de Post, Reels ou Story (com miniatura e primeiros 30 caracteres) */}
+              {(ruleForm.mode === "visual" ||
+                ruleForm.type === "comment_keyword" ||
+                ruleForm.type === "story_mention") && (
                 <div className="space-y-2">
                   <Label>{t("Publicação Alvo (Post, Reels ou Story)")}</Label>
                   <div className="relative">
@@ -637,7 +805,6 @@ export function InstagramDirectCard() {
 
                     {isMediaDropdownOpen && (
                       <div className="z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border bg-popover p-2 shadow-xl space-y-2">
-                        {/* Filtros de tipo de mídia */}
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 px-1">
                           <span className="text-xs font-medium text-muted-foreground">
                             {t("Ordenado do mais novo para o mais antigo")} ({filteredMediaItems.length})
@@ -667,7 +834,6 @@ export function InstagramDirectCard() {
                           </div>
                         </div>
 
-                        {/* Opção: Qualquer Publicação */}
                         <button
                           type="button"
                           onClick={() => handleSelectMediaItem(null)}
@@ -690,7 +856,6 @@ export function InstagramDirectCard() {
                           </div>
                         </button>
 
-                        {/* Lista de Posts, Reels e Stories ordenada do mais recente para o mais antigo */}
                         {filteredMediaItems.length === 0 ? (
                           <p className="p-3 text-center text-xs text-muted-foreground">
                             {t("Nenhuma publicação encontrada para este filtro.")}
@@ -743,119 +908,113 @@ export function InstagramDirectCard() {
                 </div>
               )}
 
-              {/* Vigência da Regra: Permanente vs Data e Hora de Início e Fim */}
-              <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <Label className="text-sm font-medium">{t("Vigência e Agendamento da Regra")}</Label>
+              {/* CONTEÚDO ESPECÍFICO: MODO VISUAL vs MODO BÁSICO */}
+              {ruleForm.mode === "visual" ? (
+                <InstagramVisualFlowBuilder
+                  graph={ruleForm.flow_graph}
+                  onChange={(nextGraph) =>
+                    setRuleForm((prev) => ({ ...prev, flow_graph: nextGraph }))
+                  }
+                  mediaItems={allMediaItems}
+                />
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="rule-type">{t("Gatilho")}</Label>
+                      <select
+                        id="rule-type"
+                        className="w-full rounded-md border bg-background p-2 text-sm"
+                        value={ruleForm.type}
+                        onChange={(e) => {
+                          const nextType = e.target.value as InstagramKeywordRule["type"];
+                          setRuleForm((r) => ({ ...r, type: nextType }));
+                          if (nextType === "story_mention") {
+                            setMediaFilterType("STORY");
+                          } else {
+                            setMediaFilterType("ALL");
+                          }
+                        }}
+                      >
+                        <option value="comment_keyword">{t("Comentário em Post ou Reels")}</option>
+                        <option value="story_mention">{t("Resposta ou Menção nos Stories")}</option>
+                        <option value="dm_keyword">{t("Palavra-Chave na Mensagem Direta (DM)")}</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="rule-match">{t("Tipo de Correspondência")}</Label>
+                      <select
+                        id="rule-match"
+                        className="w-full rounded-md border bg-background p-2 text-sm"
+                        value={ruleForm.match}
+                        onChange={(e) =>
+                          setRuleForm((r) => ({
+                            ...r,
+                            match: e.target.value as "contains" | "exact",
+                          }))
+                        }
+                      >
+                        <option value="contains">{t("Contém a palavra (Recomendado)")}</option>
+                        <option value="exact">{t("Mensagem exata")}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Palavras-chave */}
+                  <div className="space-y-2">
+                    <Label htmlFor="rule-keywords">
+                      {ruleForm.type === "story_mention"
+                        ? t("Palavras-chave no Story (deixe em branco para responder qualquer resposta/menção)")
+                        : t("Palavras-chave (separadas por vírgula)")}
+                    </Label>
+                    <Input
+                      id="rule-keywords"
+                      value={ruleForm.rawKeywords}
+                      onChange={(e) => setRuleForm((r) => ({ ...r, rawKeywords: e.target.value }))}
+                      placeholder="quero, link, cupom, comprar, preco"
+                    />
                     <p className="text-xs text-muted-foreground">
-                      {t("Defina se esta automação ficará ativa permanentemente ou apenas em um período específico.")}
+                      {t("Quando o usuário comentar ou enviar qualquer uma dessas palavras, a automação dispara.")}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setRuleForm((r) => ({ ...r, is_permanent: true }))}
-                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                        ruleForm.is_permanent
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "border bg-background text-muted-foreground hover:bg-muted"
-                      }`}
-                    >
-                      {t("Regra Permanente")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRuleForm((r) => ({ ...r, is_permanent: false }))}
-                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                        !ruleForm.is_permanent
-                          ? "bg-primary text-primary-foreground shadow-sm"
-                          : "border bg-background text-muted-foreground hover:bg-muted"
-                      }`}
-                    >
-                      {t("Definir Início e Fim")}
-                    </button>
-                  </div>
-                </div>
 
-                {!ruleForm.is_permanent && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t">
-                    <div className="space-y-1">
-                      <Label htmlFor="rule-starts-at" className="text-xs">
-                        {t("Data e Hora de Início")}
+                  {ruleForm.type === "comment_keyword" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="rule-public-reply">
+                        {t("Resposta Pública no Comentário (Opcional)")}
                       </Label>
                       <Input
-                        id="rule-starts-at"
-                        type="datetime-local"
-                        value={ruleForm.starts_at}
-                        onChange={(e) => setRuleForm((r) => ({ ...r, starts_at: e.target.value }))}
-                        className="text-xs bg-background"
+                        id="rule-public-reply"
+                        value={ruleForm.public_reply}
+                        onChange={(e) =>
+                          setRuleForm((r) => ({ ...r, public_reply: e.target.value }))
+                        }
+                        placeholder="Te enviei no direct! Dá uma olhada 🚀"
                       />
+                      <p className="text-xs text-muted-foreground">
+                        {t("A resposta que fica visível para todos abaixo do comentário do seguidor.")}
+                      </p>
                     </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="rule-ends-at" className="text-xs">
-                        {t("Data e Hora de Fim")}
-                      </Label>
-                      <Input
-                        id="rule-ends-at"
-                        type="datetime-local"
-                        value={ruleForm.ends_at}
-                        onChange={(e) => setRuleForm((r) => ({ ...r, ends_at: e.target.value }))}
-                        className="text-xs bg-background"
-                      />
-                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="rule-dm-message">{t("Mensagem enviada no Direct (DM)")}</Label>
+                    <Textarea
+                      id="rule-dm-message"
+                      rows={3}
+                      value={ruleForm.dm_message}
+                      onChange={(e) => setRuleForm((r) => ({ ...r, dm_message: e.target.value }))}
+                      placeholder="Olá {username}! Aqui está o link que você pediu: https://nexusia.work/oferta"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t("Use {username} ou {{first_name}} para personalizar com o nome do seguidor.")}
+                    </p>
                   </div>
-                )}
-              </div>
-
-              {/* Palavras-chave */}
-              <div className="space-y-2">
-                <Label htmlFor="rule-keywords">
-                  {ruleForm.type === "story_mention"
-                    ? t("Palavras-chave no Story (deixe em branco para responder qualquer resposta/menção)")
-                    : t("Palavras-chave (separadas por vírgula)")}
-                </Label>
-                <Input
-                  id="rule-keywords"
-                  value={ruleForm.rawKeywords}
-                  onChange={(e) => setRuleForm((r) => ({ ...r, rawKeywords: e.target.value }))}
-                  placeholder="quero, link, cupom, comprar, preco"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("Quando o usuário comentar ou enviar qualquer uma dessas palavras, a automação dispara.")}
-                </p>
-              </div>
-
-              {ruleForm.type === "comment_keyword" && (
-                <div className="space-y-2">
-                  <Label htmlFor="rule-public-reply">{t("Resposta Pública no Comentário (Opcional)")}</Label>
-                  <Input
-                    id="rule-public-reply"
-                    value={ruleForm.public_reply}
-                    onChange={(e) => setRuleForm((r) => ({ ...r, public_reply: e.target.value }))}
-                    placeholder="Te enviei no direct! Dá uma olhada 🚀"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t("A resposta que fica visível para todos abaixo do comentário do seguidor.")}
-                  </p>
-                </div>
+                </>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="rule-dm-message">{t("Mensagem enviada no Direct (DM)")}</Label>
-                <Textarea
-                  id="rule-dm-message"
-                  rows={3}
-                  value={ruleForm.dm_message}
-                  onChange={(e) => setRuleForm((r) => ({ ...r, dm_message: e.target.value }))}
-                  placeholder="Olá {username}! Aqui está o link que você pediu: https://nexusia.work/oferta"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("Use {username} para inserir automaticamente o arroba do seguidor.")}
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 border-t">
                 <Button
                   size="sm"
                   variant="ghost"
@@ -870,7 +1029,10 @@ export function InstagramDirectCard() {
                 <Button
                   size="sm"
                   onClick={handleSaveRule}
-                  disabled={saveRulesMutation.isPending || !ruleForm.dm_message.trim()}
+                  disabled={
+                    saveRulesMutation.isPending ||
+                    (ruleForm.mode === "basic" && !ruleForm.dm_message.trim())
+                  }
                 >
                   {saveRulesMutation.isPending
                     ? t("Salvando...")
@@ -882,10 +1044,10 @@ export function InstagramDirectCard() {
             </div>
           )}
 
-          {/* Lista de Regras Criadas */}
+          {/* Lista de Regras Criadas com Botão de Indicadores */}
           {state.keyword_rules.length === 0 && !isFormOpen ? (
             <p className="text-xs text-muted-foreground italic">
-              {t("Nenhuma regra de automação criada ainda. Clique em '+ Nova Regra' para configurar envios automáticos por palavra-chave.")}
+              {t("Nenhuma regra de automação criada ainda. Clique em '+ Regra Básica' ou '+ Regra Visual (Fluxo)' para começar.")}
             </p>
           ) : (
             <div className="space-y-2.5">
@@ -900,6 +1062,21 @@ export function InstagramDirectCard() {
                 const prodType =
                   matchedMedia?.media_product_type || rule.media_product_type || "FEED";
                 const sched = getRuleScheduleStatus(rule);
+
+                const ruleLogs = allExecutions.filter((e) => e.rule_id === rule.id);
+                const totalTriggers = Math.max(
+                  rule.stats?.total_triggers ?? 0,
+                  ruleLogs.filter((l) => l.trigger_type !== "postback").length,
+                );
+                const totalReplies = Math.max(
+                  (rule.stats?.public_replies_count ?? 0) + (rule.stats?.dms_sent_count ?? 0),
+                  ruleLogs.filter((l) => Boolean(l.public_reply_sent || l.dm_sent)).length,
+                );
+                const totalFollowers = Math.max(
+                  rule.stats?.followers_count ?? 0,
+                  ruleLogs.filter((l) => l.is_follower === true && l.trigger_type !== "postback")
+                    .length,
+                );
 
                 return (
                   <div
@@ -934,6 +1111,16 @@ export function InstagramDirectCard() {
                           {rule.name && (
                             <span className="font-semibold text-xs mr-1">{rule.name}</span>
                           )}
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] ${
+                              rule.mode === "visual"
+                                ? "border-indigo-500/40 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                                : ""
+                            }`}
+                          >
+                            {rule.mode === "visual" ? "⚡ Fluxo Visual" : "Básica"}
+                          </Badge>
                           <Badge variant="secondary" className="text-[11px] font-normal">
                             {rule.type === "comment_keyword"
                               ? t("Comentário")
@@ -984,10 +1171,35 @@ export function InstagramDirectCard() {
                         <p className="text-xs text-muted-foreground line-clamp-1">
                           📩 DM: {rule.dm_message}
                         </p>
+
+                        {/* Mini-resumo de indicadores direto no card */}
+                        <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <MessageCircle className="h-3 w-3 text-primary" />
+                            <strong className="text-foreground">{totalTriggers}</strong> acionamentos
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <Send className="h-3 w-3 text-indigo-500" />
+                            <strong className="text-foreground">{totalReplies}</strong> respostas
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <Users className="h-3 w-3 text-emerald-500" />
+                            <strong className="text-foreground">{totalFollowers}</strong> seguidores
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 px-2.5 text-xs border-primary/30 text-primary hover:bg-primary/10"
+                        onClick={() => setMetricsRuleId(rule.id)}
+                      >
+                        <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
+                        {t("Indicadores")}
+                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1019,6 +1231,17 @@ export function InstagramDirectCard() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Modal de Indicadores e Histórico de Execuções da Regra */}
+      {activeMetricsRule && (
+        <InstagramRuleMetricsModal
+          rule={activeMetricsRule}
+          executions={allExecutions}
+          onClose={() => setMetricsRuleId(null)}
+          onClearLogs={(ruleId) => clearLogsMutation.mutate(ruleId)}
+          isClearing={clearLogsMutation.isPending}
+        />
       )}
 
       {/* Dados do Webhook da Meta */}
