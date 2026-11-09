@@ -92,6 +92,7 @@ export async function GET(req: NextRequest) {
       username: me.username,
       name: me.name || me.username,
       ig_user_id: me.id,
+      access_token: long.access_token,
       profile_picture_url: me.profile_picture_url || null,
       token_expires_at: new Date(Date.now() + long.expires_in * 1000).toISOString(),
     };
@@ -111,6 +112,8 @@ export async function GET(req: NextRequest) {
       await db.from("channel_sessions").insert({
         organization_id: state.org,
         provider: SOCIAL_PROVIDER,
+        waha_session_name: `ig_direct_${state.org.slice(0, 8)}_${me.id.slice(-6)}`,
+        webhook_secret_encrypted: encryptedToken,
         zernio_account_id: me.id,
         display_name: `Instagram · @${me.username}`,
         status: "WORKING",

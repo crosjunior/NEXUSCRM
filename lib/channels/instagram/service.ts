@@ -55,6 +55,9 @@ export async function processInstagramWebhookEvent(
   if (session.meta_token_encrypted) {
     token = await decryptWebhookSecret(db, session.meta_token_encrypted as string);
   }
+  if (!token && typeof metadata.access_token === "string") {
+    token = metadata.access_token;
+  }
 
   if (!token) {
     logger.warn("[instagram.webhook] Sessão sem token decifrável", { sessionId: session.id });
@@ -64,11 +67,13 @@ export async function processInstagramWebhookEvent(
   const creds = await resolveInstagramCreds(db, orgId);
 
   // -------------------------------------------------------------------------
-  // 1. Trata Comentários (com regra de palavra-chave ou ManyChat style)
+  // 1. Trata Comentários (com regra de palavra-chave por post específico ou geral)
   // -------------------------------------------------------------------------
   if (event.kind === "comment") {
-    // Verifica se há regra para comentários
-    const matchedRule = findMatchingRule(keywordRules, "comment_keyword", event.text);
+    // Verifica se há regra para comentários (filtrando por mediaId e janela de data/hora)
+    const matchedRule = findMatchingRule(keywordRules, "comment_keyword", event.text, {
+      mediaId: event.mediaId,
+    });
     if (!matchedRule) {
       return { status: "ignored", reason: "sem_regra_para_comentario" };
     }
@@ -122,8 +127,15 @@ export async function processInstagramWebhookEvent(
     const text = event.text ?? "";
 
     // 2.1 Verifica regra de palavra-chave para story_mention ou dm_keyword
-    const ruleType = event.storyMention ? "story_mention" : "dm_keyword";
-    const matchedRule = findMatchingRule(keywordRules, ruleType, text);
+    let matchedRule: InstagramKeywordRule | null = null;
+    if (event.storyMention || event.storyReply) {
+      matchedRule = findMatchingRule(keywordRules, "story_mention", text, {
+        mediaId: event.storyId,
+      });
+    }
+    if (!matchedRule) {
+      matchedRule = findMatchingRule(keywordRules, "dm_keyword", text);
+    }
 
     if (matchedRule && matchedRule.dm_message?.trim()) {
       try {

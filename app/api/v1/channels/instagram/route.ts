@@ -5,21 +5,35 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { env } from "@/lib/env";
+import { decryptWebhookSecret } from "@/lib/webhooks/secrets";
 import { resolveInstagramCreds } from "@/lib/channels/instagram/credentials";
-import { buildAuthorizeUrl } from "@/lib/channels/instagram/api";
+import { buildAuthorizeUrl, listInstagramMedia } from "@/lib/channels/instagram/api";
 import { SOCIAL_PROVIDER } from "@/lib/channels/social/catalog";
-import type { InstagramKeywordRule, InstagramTenantConfig } from "@/lib/channels/instagram/types";
+import type {
+  InstagramKeywordRule,
+  InstagramMediaItem,
+  InstagramTenantConfig,
+} from "@/lib/channels/instagram/types";
 
 export const dynamic = "force-dynamic";
 
 const ruleSchema = z.object({
   id: z.string(),
+  name: z.string().nullable().optional(),
   type: z.enum(["comment_keyword", "story_mention", "dm_keyword"]),
   keywords: z.array(z.string()),
   match: z.enum(["contains", "exact"]),
   public_reply: z.string().nullable().optional(),
   dm_message: z.string().min(1),
   active: z.boolean(),
+  media_id: z.string().nullable().optional(),
+  media_caption_preview: z.string().nullable().optional(),
+  media_thumbnail_url: z.string().nullable().optional(),
+  media_product_type: z.string().nullable().optional(),
+  media_permalink: z.string().nullable().optional(),
+  is_permanent: z.boolean().optional(),
+  starts_at: z.string().nullable().optional(),
+  ends_at: z.string().nullable().optional(),
 });
 
 const inputSchema = z.discriminatedUnion("action", [
@@ -40,6 +54,35 @@ const inputSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("disconnect") }).strict(),
 ]);
 
+function normalizeRule(raw: Record<string, unknown>): InstagramKeywordRule {
+  const rawType = (raw.type || raw.trigger_type || "comment_keyword") as InstagramKeywordRule["type"];
+  const rawMatch = (raw.match || raw.match_type || "contains") as InstagramKeywordRule["match"];
+  return {
+    id: String(raw.id || `rule_${Date.now()}`),
+    name: typeof raw.name === "string" ? raw.name : null,
+    type:
+      rawType === "comment_keyword" || rawType === "story_mention" || rawType === "dm_keyword"
+        ? rawType
+        : "comment_keyword",
+    keywords: Array.isArray(raw.keywords) ? raw.keywords.map(String) : [],
+    match: rawMatch === "exact" ? "exact" : "contains",
+    public_reply: typeof raw.public_reply === "string" ? raw.public_reply : null,
+    dm_message: String(raw.dm_message || ""),
+    active: raw.active !== false,
+    media_id: typeof raw.media_id === "string" && raw.media_id ? raw.media_id : null,
+    media_caption_preview:
+      typeof raw.media_caption_preview === "string" ? raw.media_caption_preview : null,
+    media_thumbnail_url:
+      typeof raw.media_thumbnail_url === "string" ? raw.media_thumbnail_url : null,
+    media_product_type:
+      typeof raw.media_product_type === "string" ? raw.media_product_type : null,
+    media_permalink: typeof raw.media_permalink === "string" ? raw.media_permalink : null,
+    is_permanent: raw.is_permanent !== false,
+    starts_at: typeof raw.starts_at === "string" && raw.starts_at ? raw.starts_at : null,
+    ends_at: typeof raw.ends_at === "string" && raw.ends_at ? raw.ends_at : null,
+  };
+}
+
 export async function GET() {
   const requestId = randomUUID();
   const auth = await requireRole("admin", { requestId, resource: "instagram_channel" });
@@ -52,7 +95,9 @@ export async function GET() {
     // 1. Busca a sessão do canal do Instagram desta organização
     const { data: session } = await db
       .from("channel_sessions")
-      .select("id, display_name, status, zernio_account_id, metadata, created_at, updated_at")
+      .select(
+        "id, display_name, status, zernio_account_id, meta_token_encrypted, metadata, created_at, updated_at",
+      )
       .eq("organization_id", orgId)
       .eq("provider", SOCIAL_PROVIDER)
       .is("archived_at", null)
@@ -64,7 +109,7 @@ export async function GET() {
     // 2. Busca lista de agentes de IA disponíveis na organização
     const { data: agents } = await db
       .from("ai_agents")
-      .select("id, name, description, role, status")
+      .select("id, name, description, is_active")
       .eq("organization_id", orgId)
       .is("archived_at", null)
       .order("created_at", { ascending: false });
@@ -79,8 +124,11 @@ export async function GET() {
       session && isDirectMeta
         ? {
             id: session.id,
-            accountId: session.zernio_account_id,
-            username: (metadata.username as string) || session.display_name?.replace(/^Instagram · @/, "") || "",
+            accountId: session.zernio_account_id || String(metadata.ig_user_id || ""),
+            username:
+              (metadata.username as string) ||
+              session.display_name?.replace(/^Instagram · @/, "").replace(/^@/, "") ||
+              "",
             name: (metadata.name as string) || "",
             profile_picture_url: (metadata.profile_picture_url as string) || null,
             status: session.status,
@@ -88,12 +136,44 @@ export async function GET() {
           }
         : null;
 
+    // 4. Se a conta está conectada, busca os Posts, Reels e Stories recentes da Meta
+    let mediaItems: InstagramMediaItem[] = [];
+    if (account && session) {
+      let token: string | null = null;
+      if (session.meta_token_encrypted) {
+        token = await decryptWebhookSecret(db, session.meta_token_encrypted as string);
+      }
+      if (!token && typeof metadata.access_token === "string") {
+        token = metadata.access_token;
+      }
+      if (token && account.accountId) {
+        try {
+          mediaItems = await listInstagramMedia(creds, token, account.accountId);
+        } catch {
+          mediaItems = [];
+        }
+      }
+    }
+
+    const rawRules = Array.isArray(metadata.keyword_rules) ? metadata.keyword_rules : [];
+    const normalizedRules = rawRules.map((r) =>
+      normalizeRule((r ?? {}) as Record<string, unknown>),
+    );
+
+    const mappedAgents = (agents ?? []).map((ag) => ({
+      id: ag.id,
+      name: ag.name,
+      role: ag.description || "Atendente de IA",
+      status: ag.is_active ? "published" : "paused",
+    }));
+
     return ok({
       connected: Boolean(account),
       account,
       agent_id: (metadata.agent_id as string) || null,
-      keyword_rules: (metadata.keyword_rules as InstagramKeywordRule[]) || [],
-      available_agents: agents ?? [],
+      keyword_rules: normalizedRules,
+      media_items: mediaItems,
+      available_agents: mappedAgents,
       webhook_url: webhookUrl,
       webhook_verify_token: creds.verifyToken,
       has_custom_credentials: false,

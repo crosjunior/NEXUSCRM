@@ -90,6 +90,7 @@ export function normalizeInstagramWebhook(body: MetaWebhookPayload): NormalizedI
           }));
 
           const storyReply = Boolean(m.message.reply_to?.story);
+          const storyId = m.message.reply_to?.story?.id ? String(m.message.reply_to.story.id) : undefined;
           const isStoryMention = attachments.some((att) => att.type === "story_mention");
 
           events.push({
@@ -101,6 +102,7 @@ export function normalizeInstagramWebhook(body: MetaWebhookPayload): NormalizedI
             isEcho: Boolean(m.message.is_echo),
             storyReply,
             storyMention: isStoryMention,
+            storyId,
             attachments,
             igUserId,
           });

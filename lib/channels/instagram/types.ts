@@ -6,17 +6,41 @@ export interface InstagramAccountInfo {
   profile_picture_url?: string;
 }
 
+export interface InstagramMediaItem {
+  id: string;
+  caption?: string;
+  caption_preview: string;
+  media_type: "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM" | string;
+  media_product_type: "FEED" | "REELS" | "STORY" | "AD" | string;
+  media_url?: string;
+  thumbnail_url?: string;
+  preview_url: string | null;
+  permalink?: string;
+  timestamp: string;
+}
+
 export type InstagramKeywordType = "comment_keyword" | "story_mention" | "dm_keyword";
 export type InstagramMatchMode = "contains" | "exact";
 
 export interface InstagramKeywordRule {
   id: string;
+  name?: string | null;
   type: InstagramKeywordType;
   keywords: string[];
   match: InstagramMatchMode;
   public_reply?: string | null;
   dm_message: string;
   active: boolean;
+  /** ID do Post, Reels ou Story específico; null ou vazio = qualquer publicação */
+  media_id?: string | null;
+  media_caption_preview?: string | null;
+  media_thumbnail_url?: string | null;
+  media_product_type?: string | null;
+  media_permalink?: string | null;
+  /** Se true (padrão), a regra é permanente. Se false, respeita starts_at e ends_at */
+  is_permanent?: boolean;
+  starts_at?: string | null;
+  ends_at?: string | null;
 }
 
 export interface InstagramTenantConfig {
@@ -46,6 +70,7 @@ export type NormalizedInstagramEvent =
       isEcho: boolean;
       storyReply?: boolean;
       storyMention?: boolean;
+      storyId?: string;
       attachments: Array<{ type: string; url?: string }>;
       igUserId: string;
     }

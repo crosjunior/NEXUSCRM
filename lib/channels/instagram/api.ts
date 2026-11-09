@@ -1,6 +1,6 @@
 import { logger } from "@/lib/logger";
 import type { ResolvedInstagramCreds } from "./credentials";
-import type { InstagramAccountInfo } from "./types";
+import type { InstagramAccountInfo, InstagramMediaItem } from "./types";
 
 export const IG_SCOPES = [
   "instagram_business_basic",
@@ -388,4 +388,90 @@ export async function getInstagramUserProfile(
   } catch {
     return null;
   }
+}
+
+interface RawMediaNode {
+  id: string;
+  caption?: string;
+  media_type?: string;
+  media_product_type?: string;
+  media_url?: string;
+  thumbnail_url?: string;
+  permalink?: string;
+  timestamp?: string;
+}
+
+function formatCaptionPreview(caption?: string, productType?: string): string {
+  const clean = (caption ?? "").replace(/\s+/g, " ").trim();
+  if (!clean) {
+    if (productType === "STORY") return "Story publicado";
+    if (productType === "REELS") return "Reels sem legenda";
+    return "Post sem legenda";
+  }
+  return clean.length > 30 ? `${clean.slice(0, 30)}...` : clean;
+}
+
+function normalizeMediaNode(raw: RawMediaNode, defaultProductType = "FEED"): InstagramMediaItem {
+  const productType = raw.media_product_type || defaultProductType;
+  const mediaType = raw.media_type || "IMAGE";
+  const previewUrl =
+    mediaType === "VIDEO"
+      ? raw.thumbnail_url || raw.media_url || null
+      : raw.media_url || raw.thumbnail_url || null;
+
+  return {
+    id: String(raw.id),
+    caption: raw.caption,
+    caption_preview: formatCaptionPreview(raw.caption, productType),
+    media_type: mediaType,
+    media_product_type: productType,
+    media_url: raw.media_url,
+    thumbnail_url: raw.thumbnail_url,
+    preview_url: previewUrl,
+    permalink: raw.permalink,
+    timestamp: raw.timestamp || new Date().toISOString(),
+  };
+}
+
+/**
+ * Lista publicações (Feed, Reels e Stories ativos) da conta do Instagram,
+ * ordenadas da mais recente para a mais antiga.
+ */
+export async function listInstagramMedia(
+  creds: ResolvedInstagramCreds,
+  token: string,
+  igUserId: string,
+): Promise<InstagramMediaItem[]> {
+  const fields = "id,caption,media_type,media_product_type,media_url,thumbnail_url,permalink,timestamp";
+  const baseHost = creds.configId ? "https://graph.facebook.com" : "https://graph.instagram.com";
+  const target = igUserId || "me";
+
+  const [mediaRes, storiesRes] = await Promise.all([
+    call<{ data?: RawMediaNode[] }>(
+      `${baseHost}/${creds.graphVersion}/${target}/media?fields=${fields}&limit=40`,
+      { token },
+    ).catch(() => ({ data: [] as RawMediaNode[] })),
+    call<{ data?: RawMediaNode[] }>(
+      `${baseHost}/${creds.graphVersion}/${target}/stories?fields=${fields}&limit=25`,
+      { token },
+    ).catch(() => ({ data: [] as RawMediaNode[] })),
+  ]);
+
+  const map = new Map<string, InstagramMediaItem>();
+
+  for (const item of storiesRes.data ?? []) {
+    if (item?.id) {
+      map.set(String(item.id), normalizeMediaNode(item, "STORY"));
+    }
+  }
+
+  for (const item of mediaRes.data ?? []) {
+    if (item?.id && !map.has(String(item.id))) {
+      map.set(String(item.id), normalizeMediaNode(item, "FEED"));
+    }
+  }
+
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+  );
 }

@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { apiClient } from "@/lib/api/client";
 import { useT } from "@/hooks/i18n/useT";
-import type { InstagramKeywordRule } from "@/lib/channels/instagram/types";
+import type { InstagramKeywordRule, InstagramMediaItem } from "@/lib/channels/instagram/types";
 
 interface InstagramState {
   connected: boolean;
@@ -26,6 +26,7 @@ interface InstagramState {
   } | null;
   agent_id: string | null;
   keyword_rules: InstagramKeywordRule[];
+  media_items: InstagramMediaItem[];
   available_agents: Array<{
     id: string;
     name: string;
@@ -36,21 +37,104 @@ interface InstagramState {
   webhook_verify_token: string;
 }
 
+function formatMediaDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function toDatetimeLocalValue(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 16);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function mediaTypeBadgeLabel(productType?: string | null): string {
+  if (productType === "REELS") return "REELS";
+  if (productType === "STORY") return "STORY";
+  return "POST";
+}
+
+function getRuleScheduleStatus(rule: InstagramKeywordRule): {
+  label: string;
+  tone: "emerald" | "amber" | "red" | "muted";
+} {
+  if (!rule.active) {
+    return { label: "Pausada", tone: "muted" };
+  }
+  if (rule.is_permanent !== false) {
+    return { label: "Permanente", tone: "emerald" };
+  }
+  const now = Date.now();
+  if (rule.starts_at) {
+    const startMs = Date.parse(rule.starts_at);
+    if (!Number.isNaN(startMs) && now < startMs) {
+      return { label: `Agendada (inicia ${formatMediaDate(rule.starts_at)})`, tone: "amber" };
+    }
+  }
+  if (rule.ends_at) {
+    const endMs = Date.parse(rule.ends_at);
+    if (!Number.isNaN(endMs) && now > endMs) {
+      return { label: `Encerrada em ${formatMediaDate(rule.ends_at)}`, tone: "red" };
+    }
+    return { label: `Ativa até ${formatMediaDate(rule.ends_at)}`, tone: "emerald" };
+  }
+  return { label: "Temporária (em vigor)", tone: "emerald" };
+}
+
 export function InstagramDirectCard() {
   const t = useT();
   const queryClient = useQueryClient();
 
-  const [isAddingRule, setIsAddingRule] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
-  const [newRule, setNewRule] = useState<Partial<InstagramKeywordRule>>({
+
+  // Estado do dropdown visual de publicações (Post, Reels, Story)
+  const [isMediaDropdownOpen, setIsMediaDropdownOpen] = useState(false);
+  const [mediaFilterType, setMediaFilterType] = useState<"ALL" | "FEED" | "REELS" | "STORY">("ALL");
+
+  const [ruleForm, setRuleForm] = useState<{
+    name: string;
+    type: InstagramKeywordRule["type"];
+    match: "contains" | "exact";
+    rawKeywords: string;
+    public_reply: string;
+    dm_message: string;
+    media_id: string;
+    media_caption_preview: string | null;
+    media_thumbnail_url: string | null;
+    media_product_type: string | null;
+    media_permalink: string | null;
+    is_permanent: boolean;
+    starts_at: string;
+    ends_at: string;
+    active: boolean;
+  }>({
+    name: "",
     type: "comment_keyword",
-    keywords: [],
     match: "contains",
+    rawKeywords: "quero, link, preco",
     public_reply: "Te enviei no direct! Dá uma olhada 🚀",
-    dm_message: "Olá! Aqui está o link que você pediu: ",
+    dm_message: "Olá {username}! Aqui está o link que você pediu: ",
+    media_id: "all",
+    media_caption_preview: null,
+    media_thumbnail_url: null,
+    media_product_type: null,
+    media_permalink: null,
+    is_permanent: true,
+    starts_at: "",
+    ends_at: "",
     active: true,
   });
-  const [rawKeywords, setRawKeywords] = useState("quero, link, preco");
 
   const { data: state, isLoading } = useQuery<InstagramState>({
     queryKey: ["instagram-direct-state"],
@@ -113,8 +197,10 @@ export function InstagramDirectCard() {
       });
     },
     onSuccess: () => {
-      toast.success("Regras de automação salvas.");
-      setIsAddingRule(false);
+      toast.success("Regras de automação salvas com sucesso.");
+      setIsFormOpen(false);
+      setEditingRuleId(null);
+      setIsMediaDropdownOpen(false);
       void queryClient.invalidateQueries({ queryKey: ["instagram-direct-state"] });
     },
     onError: (err: Error) => {
@@ -122,24 +208,136 @@ export function InstagramDirectCard() {
     },
   });
 
-  function handleAddRule() {
-    const list = rawKeywords
+  function openNewRuleForm() {
+    setEditingRuleId(null);
+    setRuleForm({
+      name: "",
+      type: "comment_keyword",
+      match: "contains",
+      rawKeywords: "quero, link, preco",
+      public_reply: "Te enviei no direct! Dá uma olhada 🚀",
+      dm_message: "Olá {username}! Aqui está o link que você pediu: ",
+      media_id: "all",
+      media_caption_preview: null,
+      media_thumbnail_url: null,
+      media_product_type: null,
+      media_permalink: null,
+      is_permanent: true,
+      starts_at: "",
+      ends_at: "",
+      active: true,
+    });
+    setIsMediaDropdownOpen(false);
+    setIsFormOpen(true);
+  }
+
+  function openEditRuleForm(rule: InstagramKeywordRule) {
+    setEditingRuleId(rule.id);
+    setRuleForm({
+      name: rule.name || "",
+      type: rule.type || "comment_keyword",
+      match: rule.match || "contains",
+      rawKeywords: (rule.keywords || []).join(", "),
+      public_reply: rule.public_reply || "",
+      dm_message: rule.dm_message || "",
+      media_id: rule.media_id || "all",
+      media_caption_preview: rule.media_caption_preview || null,
+      media_thumbnail_url: rule.media_thumbnail_url || null,
+      media_product_type: rule.media_product_type || null,
+      media_permalink: rule.media_permalink || null,
+      is_permanent: rule.is_permanent !== false,
+      starts_at: toDatetimeLocalValue(rule.starts_at),
+      ends_at: toDatetimeLocalValue(rule.ends_at),
+      active: rule.active !== false,
+    });
+    setIsMediaDropdownOpen(false);
+    setIsFormOpen(true);
+  }
+
+  function handleSelectMediaItem(item: InstagramMediaItem | null) {
+    if (!item) {
+      setRuleForm((prev) => ({
+        ...prev,
+        media_id: "all",
+        media_caption_preview: null,
+        media_thumbnail_url: null,
+        media_product_type: null,
+        media_permalink: null,
+      }));
+    } else {
+      setRuleForm((prev) => ({
+        ...prev,
+        media_id: item.id,
+        media_caption_preview: item.caption_preview,
+        media_thumbnail_url: item.preview_url,
+        media_product_type: item.media_product_type,
+        media_permalink: item.permalink || null,
+      }));
+    }
+    setIsMediaDropdownOpen(false);
+  }
+
+  function handleSaveRule() {
+    const list = ruleForm.rawKeywords
       .split(",")
       .map((k) => k.trim())
       .filter(Boolean);
 
-    const rule: InstagramKeywordRule = {
-      id: `rule_${Date.now()}`,
-      type: newRule.type || "comment_keyword",
+    if (ruleForm.type !== "story_mention" && list.length === 0) {
+      toast.error("Informe pelo menos uma palavra-chave.");
+      return;
+    }
+
+    if (!ruleForm.is_permanent && ruleForm.starts_at && ruleForm.ends_at) {
+      if (new Date(ruleForm.starts_at).getTime() >= new Date(ruleForm.ends_at).getTime()) {
+        toast.error("A data/hora de fim deve ser posterior à data/hora de início.");
+        return;
+      }
+    }
+
+    const isSpecificMedia = ruleForm.media_id && ruleForm.media_id !== "all";
+    const startsIso =
+      !ruleForm.is_permanent && ruleForm.starts_at
+        ? new Date(ruleForm.starts_at).toISOString()
+        : null;
+    const endsIso =
+      !ruleForm.is_permanent && ruleForm.ends_at
+        ? new Date(ruleForm.ends_at).toISOString()
+        : null;
+
+    const ruleToSave: InstagramKeywordRule = {
+      id: editingRuleId || `rule_${Date.now()}`,
+      name: ruleForm.name.trim() || null,
+      type: ruleForm.type,
       keywords: list,
-      match: newRule.match || "contains",
-      public_reply: newRule.public_reply || null,
-      dm_message: newRule.dm_message || "",
-      active: true,
+      match: ruleForm.match,
+      public_reply: ruleForm.type === "comment_keyword" ? ruleForm.public_reply || null : null,
+      dm_message: ruleForm.dm_message.trim(),
+      active: ruleForm.active,
+      media_id: isSpecificMedia ? ruleForm.media_id : null,
+      media_caption_preview: isSpecificMedia ? ruleForm.media_caption_preview : null,
+      media_thumbnail_url: isSpecificMedia ? ruleForm.media_thumbnail_url : null,
+      media_product_type: isSpecificMedia ? ruleForm.media_product_type : null,
+      media_permalink: isSpecificMedia ? ruleForm.media_permalink : null,
+      is_permanent: ruleForm.is_permanent,
+      starts_at: startsIso,
+      ends_at: endsIso,
     };
 
     const currentRules = state?.keyword_rules || [];
-    saveRulesMutation.mutate([...currentRules, rule]);
+    const nextRules = editingRuleId
+      ? currentRules.map((r) => (r.id === editingRuleId ? ruleToSave : r))
+      : [...currentRules, ruleToSave];
+
+    saveRulesMutation.mutate(nextRules);
+  }
+
+  function handleToggleRuleActive(ruleId: string) {
+    const currentRules = state?.keyword_rules || [];
+    const updated = currentRules.map((r) =>
+      r.id === ruleId ? { ...r, active: !r.active } : r,
+    );
+    saveRulesMutation.mutate(updated);
   }
 
   function handleRemoveRule(ruleId: string) {
@@ -163,6 +361,24 @@ export function InstagramDirectCard() {
 
   const account = state?.account;
   const isConnected = state?.connected && !!account;
+  const allMediaItems = state?.media_items || [];
+
+  const filteredMediaItems = allMediaItems.filter((item) => {
+    if (mediaFilterType === "ALL") return true;
+    return item.media_product_type === mediaFilterType;
+  });
+
+  const selectedMediaObj =
+    ruleForm.media_id && ruleForm.media_id !== "all"
+      ? allMediaItems.find((m) => m.id === ruleForm.media_id) || {
+          id: ruleForm.media_id,
+          caption_preview: ruleForm.media_caption_preview || "Publicação selecionada",
+          preview_url: ruleForm.media_thumbnail_url || null,
+          media_product_type: ruleForm.media_product_type || "FEED",
+          media_type: "IMAGE",
+          timestamp: "",
+        }
+      : null;
 
   return (
     <Card className="space-y-6 p-6 border-primary/20 bg-card/60 backdrop-blur-sm">
@@ -216,6 +432,7 @@ export function InstagramDirectCard() {
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border bg-muted/30 p-4">
           <div className="flex items-center gap-3">
             {account.profile_picture_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={account.profile_picture_url}
                 alt={account.username}
@@ -262,7 +479,7 @@ export function InstagramDirectCard() {
               <option value="">{t("Nenhum (Somente Atendimento Humano ou Automações)")}</option>
               {state.available_agents.map((ag) => (
                 <option key={ag.id} value={ag.id}>
-                  {ag.name} ({ag.role}) {ag.status === "published" ? "✓ Publicado" : ""}
+                  {ag.name} ({ag.role}) {ag.status === "published" ? "✓ Ativo" : ""}
                 </option>
               ))}
             </select>
@@ -270,7 +487,7 @@ export function InstagramDirectCard() {
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => saveAgentMutation.mutate(selectedAgentId || null)}
+              onClick={() => saveAgentMutation.mutate(selectedAgentId || state.agent_id || null)}
               disabled={saveAgentMutation.isPending}
             >
               {saveAgentMutation.isPending ? t("Salvando...") : t("Vincular Agente")}
@@ -286,20 +503,38 @@ export function InstagramDirectCard() {
             <div>
               <h4 className="text-sm font-semibold">{t("Automações de Comentários, Stories e DMs")}</h4>
               <p className="text-xs text-muted-foreground">
-                {t("Envie links ou mensagens no Direct automaticamente quando alguém comentar no Post/Reel ou mencionar nos Stories.")}
+                {t("Crie quantas regras desejar para responder comentários em Posts, Reels ou Stories específicos (ou em qualquer publicação), com vigência permanente ou agendada.")}
               </p>
             </div>
-            {!isAddingRule && (
-              <Button size="sm" variant="outline" onClick={() => setIsAddingRule(true)}>
+            {!isFormOpen && (
+              <Button size="sm" variant="outline" onClick={openNewRuleForm}>
                 {t("+ Nova Regra")}
               </Button>
             )}
           </div>
 
-          {/* Formulário de Nova Regra */}
-          {isAddingRule && (
+          {/* Formulário de Criação / Edição de Regra */}
+          {isFormOpen && (
             <div className="space-y-4 rounded-lg border bg-background p-4 shadow-sm">
-              <h5 className="text-sm font-semibold">{t("Criar Nova Regra de Automação")}</h5>
+              <div className="flex items-center justify-between border-b pb-2">
+                <h5 className="text-sm font-semibold">
+                  {editingRuleId ? t("Editar Regra de Automação") : t("Criar Nova Regra de Automação")}
+                </h5>
+                <Badge variant="outline" className="text-xs">
+                  {editingRuleId ? t("Modo Edição") : t("Nova Regra")}
+                </Badge>
+              </div>
+
+              {/* Nome opcional da regra */}
+              <div className="space-y-1.5">
+                <Label htmlFor="rule-name">{t("Nome de identificação da regra (Opcional)")}</Label>
+                <Input
+                  id="rule-name"
+                  value={ruleForm.name}
+                  onChange={(e) => setRuleForm((r) => ({ ...r, name: e.target.value }))}
+                  placeholder="Ex: Promoção Mentoria IA - Reels de Novembro"
+                />
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -307,61 +542,301 @@ export function InstagramDirectCard() {
                   <select
                     id="rule-type"
                     className="w-full rounded-md border bg-background p-2 text-sm"
-                    value={newRule.type}
-                    onChange={(e) =>
-                      setNewRule((r) => ({ ...r, type: e.target.value as InstagramKeywordRule["type"] }))
-                    }
+                    value={ruleForm.type}
+                    onChange={(e) => {
+                      const nextType = e.target.value as InstagramKeywordRule["type"];
+                      setRuleForm((r) => ({ ...r, type: nextType }));
+                      if (nextType === "story_mention") {
+                        setMediaFilterType("STORY");
+                      } else {
+                        setMediaFilterType("ALL");
+                      }
+                    }}
                   >
                     <option value="comment_keyword">{t("Comentário em Post ou Reels")}</option>
-                    <option value="story_mention">{t("Menção nos Stories")}</option>
+                    <option value="story_mention">{t("Resposta ou Menção nos Stories")}</option>
                     <option value="dm_keyword">{t("Palavra-Chave na Mensagem Direta (DM)")}</option>
                   </select>
                 </div>
 
-                {newRule.type !== "story_mention" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="rule-match">{t("Tipo de Correspondência")}</Label>
-                    <select
-                      id="rule-match"
-                      className="w-full rounded-md border bg-background p-2 text-sm"
-                      value={newRule.match}
-                      onChange={(e) =>
-                        setNewRule((r) => ({ ...r, match: e.target.value as "contains" | "exact" }))
-                      }
+                <div className="space-y-2">
+                  <Label htmlFor="rule-match">{t("Tipo de Correspondência")}</Label>
+                  <select
+                    id="rule-match"
+                    className="w-full rounded-md border bg-background p-2 text-sm"
+                    value={ruleForm.match}
+                    onChange={(e) =>
+                      setRuleForm((r) => ({ ...r, match: e.target.value as "contains" | "exact" }))
+                    }
+                  >
+                    <option value="contains">{t("Contém a palavra (Recomendado)")}</option>
+                    <option value="exact">{t("Mensagem exata")}</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Seletor Visual de Post, Reels ou Story (com miniatura e primeiros 30 caracteres, ordenado do mais novo para o mais antigo) */}
+              {(ruleForm.type === "comment_keyword" || ruleForm.type === "story_mention") && (
+                <div className="space-y-2">
+                  <Label>{t("Publicação Alvo (Post, Reels ou Story)")}</Label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsMediaDropdownOpen((o) => !o)}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted/40"
                     >
-                      <option value="contains">{t("Contém a palavra (Recomendado)")}</option>
-                      <option value="exact">{t("Mensagem exata")}</option>
-                    </select>
+                      {selectedMediaObj ? (
+                        <div className="flex items-center gap-3 min-w-0">
+                          {selectedMediaObj.preview_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={selectedMediaObj.preview_url}
+                              alt=""
+                              className="h-10 w-10 shrink-0 rounded-md border object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-muted text-xs font-bold">
+                              IG
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                {mediaTypeBadgeLabel(selectedMediaObj.media_product_type)}
+                              </Badge>
+                              <span className="font-medium truncate">
+                                {selectedMediaObj.caption_preview}
+                              </span>
+                            </div>
+                            {selectedMediaObj.timestamp && (
+                              <span className="text-[11px] text-muted-foreground">
+                                Publicado em {formatMediaDate(selectedMediaObj.timestamp)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-primary/30 bg-primary/10 text-primary text-xs font-bold">
+                            ALL
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {t("Qualquer publicação (Todos os Posts, Reels ou Stories)")}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {t("A regra responderá em qualquer publicação presente ou futura.")}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {isMediaDropdownOpen ? "▲ Fechar" : "▼ Selecionar"}
+                      </span>
+                    </button>
+
+                    {isMediaDropdownOpen && (
+                      <div className="z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border bg-popover p-2 shadow-xl space-y-2">
+                        {/* Filtros de tipo de mídia */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 px-1">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            {t("Ordenado do mais novo para o mais antigo")} ({filteredMediaItems.length})
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {(
+                              [
+                                { key: "ALL", label: "Todos" },
+                                { key: "FEED", label: "Posts" },
+                                { key: "REELS", label: "Reels" },
+                                { key: "STORY", label: "Stories" },
+                              ] as const
+                            ).map((tab) => (
+                              <button
+                                key={tab.key}
+                                type="button"
+                                onClick={() => setMediaFilterType(tab.key)}
+                                className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+                                  mediaFilterType === tab.key
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                }`}
+                              >
+                                {tab.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Opção: Qualquer Publicação */}
+                        <button
+                          type="button"
+                          onClick={() => handleSelectMediaItem(null)}
+                          className={`flex w-full items-center gap-3 rounded-md p-2 text-left text-sm transition-colors hover:bg-muted ${
+                            ruleForm.media_id === "all" || !ruleForm.media_id
+                              ? "bg-primary/10 border border-primary/30"
+                              : ""
+                          }`}
+                        >
+                          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border bg-primary/10 text-primary text-xs font-bold">
+                            ALL
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold">
+                              {t("Qualquer publicação (Posts, Reels ou Stories)")}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {t("Aplica esta regra a todos os posts da conta")}
+                            </div>
+                          </div>
+                        </button>
+
+                        {/* Lista de Posts, Reels e Stories ordenada do mais recente para o mais antigo */}
+                        {filteredMediaItems.length === 0 ? (
+                          <p className="p-3 text-center text-xs text-muted-foreground">
+                            {t("Nenhuma publicação encontrada para este filtro.")}
+                          </p>
+                        ) : (
+                          filteredMediaItems.map((item) => {
+                            const isSelected = ruleForm.media_id === item.id;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => handleSelectMediaItem(item)}
+                                className={`flex w-full items-center gap-3 rounded-md p-2 text-left text-sm transition-colors hover:bg-muted ${
+                                  isSelected ? "bg-primary/10 border border-primary/30" : ""
+                                }`}
+                              >
+                                {item.preview_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={item.preview_url}
+                                    alt=""
+                                    className="h-11 w-11 shrink-0 rounded-md border object-cover bg-muted"
+                                  />
+                                ) : (
+                                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border bg-muted text-[10px] font-bold">
+                                    {mediaTypeBadgeLabel(item.media_product_type)}
+                                  </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                                      {mediaTypeBadgeLabel(item.media_product_type)}
+                                    </Badge>
+                                    <span className="font-medium truncate">
+                                      {item.caption_preview}
+                                    </span>
+                                  </div>
+                                  <div className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
+                                    <span>{formatMediaDate(item.timestamp)}</span>
+                                    <span>· ID: {item.id.slice(-6)}</span>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Vigência da Regra: Permanente vs Data e Hora de Início e Fim */}
+              <div className="space-y-3 rounded-lg border bg-muted/20 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <Label className="text-sm font-medium">{t("Vigência e Agendamento da Regra")}</Label>
+                    <p className="text-xs text-muted-foreground">
+                      {t("Defina se esta automação ficará ativa permanentemente ou apenas em um período específico.")}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRuleForm((r) => ({ ...r, is_permanent: true }))}
+                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                        ruleForm.is_permanent
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "border bg-background text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {t("Regra Permanente")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRuleForm((r) => ({ ...r, is_permanent: false }))}
+                      className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                        !ruleForm.is_permanent
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "border bg-background text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {t("Definir Início e Fim")}
+                    </button>
+                  </div>
+                </div>
+
+                {!ruleForm.is_permanent && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t">
+                    <div className="space-y-1">
+                      <Label htmlFor="rule-starts-at" className="text-xs">
+                        {t("Data e Hora de Início")}
+                      </Label>
+                      <Input
+                        id="rule-starts-at"
+                        type="datetime-local"
+                        value={ruleForm.starts_at}
+                        onChange={(e) => setRuleForm((r) => ({ ...r, starts_at: e.target.value }))}
+                        className="text-xs bg-background"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="rule-ends-at" className="text-xs">
+                        {t("Data e Hora de Fim")}
+                      </Label>
+                      <Input
+                        id="rule-ends-at"
+                        type="datetime-local"
+                        value={ruleForm.ends_at}
+                        onChange={(e) => setRuleForm((r) => ({ ...r, ends_at: e.target.value }))}
+                        className="text-xs bg-background"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
 
-              {newRule.type !== "story_mention" && (
-                <div className="space-y-2">
-                  <Label htmlFor="rule-keywords">{t("Palavras-chave (separadas por vírgula)")}</Label>
-                  <Input
-                    id="rule-keywords"
-                    value={rawKeywords}
-                    onChange={(e) => setRawKeywords(e.target.value)}
-                    placeholder="quero, link, cupom, comprar, preco"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t("Quando o usuário digitar qualquer uma dessas palavras, a automação dispara.")}
-                  </p>
-                </div>
-              )}
+              {/* Palavras-chave */}
+              <div className="space-y-2">
+                <Label htmlFor="rule-keywords">
+                  {ruleForm.type === "story_mention"
+                    ? t("Palavras-chave no Story (deixe em branco para responder qualquer resposta/menção)")
+                    : t("Palavras-chave (separadas por vírgula)")}
+                </Label>
+                <Input
+                  id="rule-keywords"
+                  value={ruleForm.rawKeywords}
+                  onChange={(e) => setRuleForm((r) => ({ ...r, rawKeywords: e.target.value }))}
+                  placeholder="quero, link, cupom, comprar, preco"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t("Quando o usuário comentar ou enviar qualquer uma dessas palavras, a automação dispara.")}
+                </p>
+              </div>
 
-              {newRule.type === "comment_keyword" && (
+              {ruleForm.type === "comment_keyword" && (
                 <div className="space-y-2">
                   <Label htmlFor="rule-public-reply">{t("Resposta Pública no Comentário (Opcional)")}</Label>
                   <Input
                     id="rule-public-reply"
-                    value={newRule.public_reply || ""}
-                    onChange={(e) => setNewRule((r) => ({ ...r, public_reply: e.target.value }))}
+                    value={ruleForm.public_reply}
+                    onChange={(e) => setRuleForm((r) => ({ ...r, public_reply: e.target.value }))}
                     placeholder="Te enviei no direct! Dá uma olhada 🚀"
                   />
                   <p className="text-xs text-muted-foreground">
-                    {t("A resposta que fica visível para todos no comentário da publicação.")}
+                    {t("A resposta que fica visível para todos abaixo do comentário do seguidor.")}
                   </p>
                 </div>
               )}
@@ -371,8 +846,8 @@ export function InstagramDirectCard() {
                 <Textarea
                   id="rule-dm-message"
                   rows={3}
-                  value={newRule.dm_message || ""}
-                  onChange={(e) => setNewRule((r) => ({ ...r, dm_message: e.target.value }))}
+                  value={ruleForm.dm_message}
+                  onChange={(e) => setRuleForm((r) => ({ ...r, dm_message: e.target.value }))}
                   placeholder="Olá {username}! Aqui está o link que você pediu: https://nexusia.work/oferta"
                 />
                 <p className="text-xs text-muted-foreground">
@@ -380,62 +855,167 @@ export function InstagramDirectCard() {
                 </p>
               </div>
 
-              <div className="flex justify-end gap-2">
-                <Button size="sm" variant="ghost" onClick={() => setIsAddingRule(false)}>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setIsFormOpen(false);
+                    setEditingRuleId(null);
+                    setIsMediaDropdownOpen(false);
+                  }}
+                >
                   {t("Cancelar")}
                 </Button>
                 <Button
                   size="sm"
-                  onClick={handleAddRule}
-                  disabled={saveRulesMutation.isPending || !newRule.dm_message?.trim()}
+                  onClick={handleSaveRule}
+                  disabled={saveRulesMutation.isPending || !ruleForm.dm_message.trim()}
                 >
-                  {saveRulesMutation.isPending ? t("Salvando...") : t("Salvar Regra")}
+                  {saveRulesMutation.isPending
+                    ? t("Salvando...")
+                    : editingRuleId
+                    ? t("Atualizar Regra")
+                    : t("Salvar Regra")}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Lista de Regras Ativas */}
-          {state.keyword_rules.length === 0 && !isAddingRule ? (
+          {/* Lista de Regras Criadas */}
+          {state.keyword_rules.length === 0 && !isFormOpen ? (
             <p className="text-xs text-muted-foreground italic">
               {t("Nenhuma regra de automação criada ainda. Clique em '+ Nova Regra' para configurar envios automáticos por palavra-chave.")}
             </p>
           ) : (
-            <div className="space-y-2">
-              {state.keyword_rules.map((rule) => (
-                <div
-                  key={rule.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background p-3 text-sm"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs font-normal">
-                        {rule.type === "comment_keyword"
-                          ? t("Comentário")
-                          : rule.type === "story_mention"
-                          ? t("Story")
-                          : t("DM")}
-                      </Badge>
-                      {rule.keywords.length > 0 && (
-                        <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
-                          {rule.keywords.join(", ")}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-1">
-                      DM: {rule.dm_message}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive hover:bg-destructive/10 h-8 px-2"
-                    onClick={() => handleRemoveRule(rule.id)}
+            <div className="space-y-2.5">
+              {state.keyword_rules.map((rule) => {
+                const matchedMedia =
+                  rule.media_id && rule.media_id !== "all"
+                    ? allMediaItems.find((m) => m.id === rule.media_id)
+                    : null;
+                const thumbUrl = matchedMedia?.preview_url || rule.media_thumbnail_url || null;
+                const captionPreview =
+                  matchedMedia?.caption_preview || rule.media_caption_preview || null;
+                const prodType =
+                  matchedMedia?.media_product_type || rule.media_product_type || "FEED";
+                const sched = getRuleScheduleStatus(rule);
+
+                return (
+                  <div
+                    key={rule.id}
+                    className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background p-3.5 text-sm transition-opacity ${
+                      rule.active ? "" : "opacity-60"
+                    }`}
                   >
-                    {t("Excluir")}
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      {/* Miniatura do Post/Reels/Story ou Ícone Geral */}
+                      {rule.media_id && rule.media_id !== "all" ? (
+                        thumbUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={thumbUrl}
+                            alt=""
+                            className="h-12 w-12 shrink-0 rounded-md border object-cover bg-muted"
+                          />
+                        ) : (
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border bg-muted text-[10px] font-bold">
+                            {mediaTypeBadgeLabel(prodType)}
+                          </div>
+                        )
+                      ) : (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-primary/20 bg-primary/5 text-[10px] font-bold text-primary">
+                          TODOS
+                        </div>
+                      )}
+
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {rule.name && (
+                            <span className="font-semibold text-xs mr-1">{rule.name}</span>
+                          )}
+                          <Badge variant="secondary" className="text-[11px] font-normal">
+                            {rule.type === "comment_keyword"
+                              ? t("Comentário")
+                              : rule.type === "story_mention"
+                              ? t("Story")
+                              : t("DM")}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className={`text-[10px] ${
+                              sched.tone === "emerald"
+                                ? "border-emerald-500/40 text-emerald-500"
+                                : sched.tone === "amber"
+                                ? "border-amber-500/40 text-amber-500"
+                                : sched.tone === "red"
+                                ? "border-destructive/40 text-destructive"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {sched.label}
+                          </Badge>
+                          {rule.keywords.length > 0 && (
+                            <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                              {rule.keywords.join(", ")}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Indicador do Post / Reels / Story específico ou Qualquer Publicação */}
+                        <p className="text-xs text-muted-foreground truncate">
+                          {rule.media_id && rule.media_id !== "all" ? (
+                            <span>
+                              <strong className="text-foreground">
+                                [{mediaTypeBadgeLabel(prodType)}]
+                              </strong>{" "}
+                              {captionPreview || `ID ${rule.media_id}`}
+                            </span>
+                          ) : (
+                            <span>{t("Aplicada em: Qualquer publicação")}</span>
+                          )}
+                        </p>
+
+                        {rule.public_reply && (
+                          <p className="text-xs text-muted-foreground line-clamp-1">
+                            💬 Comentário: {rule.public_reply}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          📩 DM: {rule.dm_message}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => handleToggleRuleActive(rule.id)}
+                      >
+                        {rule.active ? t("Pausar") : t("Ativar")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => openEditRuleForm(rule)}
+                      >
+                        {t("Editar")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:bg-destructive/10 h-8 px-2 text-xs"
+                        onClick={() => handleRemoveRule(rule.id)}
+                      >
+                        {t("Excluir")}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

@@ -34,12 +34,15 @@ export const socialAdapter: ChannelAdapter = {
 
     // Conexão Direta Oficial com a Meta (Instagram Direct)
     if (metadata.direct_meta === true) {
-      if (!data?.meta_token_encrypted) {
-        return { reachable: true, status: "FAILED", detail: "credencial_indisponivel" };
+      let token: string | null = null;
+      if (data?.meta_token_encrypted) {
+        token = await decryptWebhookSecret(db, data.meta_token_encrypted as string);
       }
-      const token = await decryptWebhookSecret(db, data.meta_token_encrypted as string);
+      if (!token && typeof metadata.access_token === "string") {
+        token = metadata.access_token;
+      }
       if (!token) {
-        return { reachable: true, status: "FAILED", detail: "falha_decifrar_token" };
+        return { reachable: true, status: "FAILED", detail: "credencial_indisponivel" };
       }
       try {
         const creds = await resolveInstagramCreds(db, input.organizationId);
@@ -145,11 +148,14 @@ export const socialAdapter: ChannelAdapter = {
 
     // Envio Direto via Meta Graph API (Instagram Direct)
     if (metadata.direct_meta === true) {
-      if (!session?.meta_token_encrypted) {
-        throw new Error("Credencial oficial da Meta ausente na sessão.");
+      let token: string | null = null;
+      if (session?.meta_token_encrypted) {
+        token = await decryptWebhookSecret(db, session.meta_token_encrypted as string);
       }
-      const token = await decryptWebhookSecret(db, session.meta_token_encrypted as string);
-      if (!token) throw new Error("Falha ao decifrar o token oficial da Meta.");
+      if (!token && typeof metadata.access_token === "string") {
+        token = metadata.access_token;
+      }
+      if (!token) throw new Error("Credencial oficial da Meta ausente na sessão.");
 
       await envelope.beforeSend?.();
       const creds = await resolveInstagramCreds(db, envelope.organizationId);
