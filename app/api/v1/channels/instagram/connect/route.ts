@@ -13,11 +13,12 @@ export async function GET() {
     return NextResponse.redirect(`${env.NEXT_PUBLIC_APP_URL}/login`);
   }
 
-  const orgId = await resolveActiveOrg();
-  if (!orgId) {
+  const org = await resolveActiveOrg(user);
+  if (!org) {
     return NextResponse.redirect(`${env.NEXT_PUBLIC_APP_URL}/app`);
   }
 
+  const orgId = org.id;
   const db = createAdminClient();
   const creds = await resolveInstagramCreds(db, orgId);
 

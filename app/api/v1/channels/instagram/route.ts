@@ -42,7 +42,7 @@ const inputSchema = z.discriminatedUnion("action", [
 
 export async function GET() {
   const requestId = randomUUID();
-  const auth = await requireRole("user", { requestId, resource: "instagram_channel" });
+  const auth = await requireRole("admin", { requestId, resource: "instagram_channel" });
   if (!auth.ok) return auth.response;
 
   const orgId = auth.org.orgId;
@@ -172,12 +172,13 @@ export async function POST(req: Request) {
         .eq("organization_id", orgId);
 
       await audit({
+        action: "channel.ai_access_updated",
+        actorUserId: auth.user.id,
         organizationId: orgId,
-        actorId: auth.user.id,
-        action: "channel_session.update",
-        entity: "channel_sessions",
-        entityId: session.id,
-        after: { agent_id: payload.agent_id },
+        resourceType: "channel_session",
+        resourceId: session.id,
+        requestId,
+        metadata: { agent_id: payload.agent_id },
       });
 
       return ok({ success: true, agent_id: payload.agent_id });
@@ -209,12 +210,13 @@ export async function POST(req: Request) {
         .eq("organization_id", orgId);
 
       await audit({
+        action: "channel.social_configured",
+        actorUserId: auth.user.id,
         organizationId: orgId,
-        actorId: auth.user.id,
-        action: "channel_session.update",
-        entity: "channel_sessions",
-        entityId: session.id,
-        after: { keyword_rules_count: payload.rules.length },
+        resourceType: "channel_session",
+        resourceId: session.id,
+        requestId,
+        metadata: { keyword_rules_count: payload.rules.length },
       });
 
       return ok({ success: true, count: payload.rules.length });
@@ -242,12 +244,13 @@ export async function POST(req: Request) {
         .eq("id", orgId);
 
       await audit({
+        action: "org.updated",
+        actorUserId: auth.user.id,
         organizationId: orgId,
-        actorId: auth.user.id,
-        action: "organization.update_settings",
-        entity: "organizations",
-        entityId: orgId,
-        after: { custom_instagram: true },
+        resourceType: "organization",
+        resourceId: orgId,
+        requestId,
+        metadata: { custom_instagram: true },
       });
 
       return ok({ success: true });
@@ -277,11 +280,12 @@ export async function POST(req: Request) {
           .eq("organization_id", orgId);
 
         await audit({
+          action: "channel.archived",
+          actorUserId: auth.user.id,
           organizationId: orgId,
-          actorId: auth.user.id,
-          action: "channel_session.archive",
-          entity: "channel_sessions",
-          entityId: session.id,
+          resourceType: "channel_session",
+          resourceId: session.id,
+          requestId,
         });
       }
 

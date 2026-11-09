@@ -56,7 +56,7 @@ export function InstagramDirectCard() {
     queryKey: ["instagram-direct-state"],
     queryFn: async () => {
       const res = await apiClient.get<{ data: InstagramState }>("/api/v1/channels/instagram");
-      return res.data.data;
+      return res.data;
     },
   });
 
@@ -65,7 +65,7 @@ export function InstagramDirectCard() {
       const res = await apiClient.post<{ data: { auth_url: string } }>("/api/v1/channels/instagram", {
         action: "get_connect_url",
       });
-      return res.data.data.auth_url;
+      return res.data.auth_url;
     },
     onSuccess: (url) => {
       window.location.href = url;
@@ -452,12 +452,12 @@ export function InstagramDirectCard() {
           <div className="space-y-1">
             <span className="text-muted-foreground">{t("URL de Retorno de Chamada (Callback URL):")}</span>
             <div className="flex items-center gap-2">
-              <Input readOnly value={state.webhook_url} className="font-mono text-xs h-8 bg-background" />
+              <Input readOnly value={state?.webhook_url || ""} className="font-mono text-xs h-8 bg-background" />
               <Button
                 size="sm"
                 variant="outline"
                 className="h-8"
-                onClick={() => copyToClipboard(state.webhook_url, "URL do Webhook")}
+                onClick={() => state?.webhook_url && copyToClipboard(state.webhook_url, "URL do Webhook")}
               >
                 {t("Copiar")}
               </Button>
@@ -469,14 +469,14 @@ export function InstagramDirectCard() {
             <div className="flex items-center gap-2">
               <Input
                 readOnly
-                value={state.webhook_verify_token}
+                value={state?.webhook_verify_token || ""}
                 className="font-mono text-xs h-8 bg-background"
               />
               <Button
                 size="sm"
                 variant="outline"
                 className="h-8"
-                onClick={() => copyToClipboard(state.webhook_verify_token, "Token de Verificação")}
+                onClick={() => state?.webhook_verify_token && copyToClipboard(state.webhook_verify_token, "Token de Verificação")}
               >
                 {t("Copiar")}
               </Button>

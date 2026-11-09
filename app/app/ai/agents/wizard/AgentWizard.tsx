@@ -519,7 +519,7 @@ export function AgentWizard({ context }: Props) {
                   desc: "Caso o cliente pergunte diretamente se está falando com um robô ou IA, o assistente confirma de forma simpática e solícita.",
                 },
               ].map((guard) => {
-                const isChecked = (form.guardrails as Record<string, boolean>)[guard.key];
+                const isChecked = Boolean((form.guardrails as Record<string, unknown>)[guard.key]);
                 return (
                   <div
                     key={guard.key}
