@@ -18,7 +18,7 @@ export async function GET() {
     return NextResponse.redirect(`${env.NEXT_PUBLIC_APP_URL}/app`);
   }
 
-  const orgId = org.id;
+  const orgId = org.orgId;
   const db = createAdminClient();
   const creds = await resolveInstagramCreds(db, orgId);
 
