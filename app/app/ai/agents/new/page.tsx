@@ -14,7 +14,7 @@ import { fusoUtilizavel } from "@/lib/tempo/fusos";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Sparkle, ArrowRight } from "@/lib/ui/icons";
-import { getT } from "@/lib/i18n/server";
+import { traduzir } from "@/lib/i18n/dicionario";
 import { AgentForm } from "../[id]/_components/AgentForm";
 
 export const dynamic = "force-dynamic";
@@ -38,8 +38,8 @@ function provedoresDaInstalacao(): string[] {
 }
 
 export default async function NewAgentPage() {
-  const t = await getT();
   const user = await requireAuth();
+  const t = (texto: string) => traduzir(texto, user.idioma);
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
   if (ROLE_RANK[activeOrg.role] < ROLE_RANK.admin) {

@@ -19039,6 +19039,17 @@ export const DICIONARIO: Traducoes = {
   "Formato hexadecimal inválido (ex: #001b4a)": { es: "Formato hexadecimal inválido (ej: #001b4a)" },
   "Pesquisar cor (ex: dourado, azul, marinho, verde)...": { es: "Buscar color (ej: dorado, azul, marino, verde)..." },
   "Configure sua empresa, marca, produtos e funil enviando materiais e arquivos.": { es: "Configura tu empresa, marca, productos y embudo enviando materiales y archivos." },
+  "Comentário com palavra-chave": { es: "Comentario con palabra clave" },
+  "DM com palavra-chave": { es: "DM con palabra clave" },
+  "Menção no Story": { es: "Mención en Historia" },
+  "Qualquer mensagem (padrão)": { es: "Cualquier mensaje (predeterminado)" },
+  "é seguidor do perfil": { es: "es seguidor del perfil" },
+  "NÃO é seguidor do perfil": { es: "NO es seguidor del perfil" },
+  "não tem a tag": { es: "no tiene la etiqueta" },
+  "campo igual a": { es: "campo igual a" },
+  "campo contém": { es: "campo contiene" },
+  "campo preenchido": { es: "campo completado" },
+  "Chamar webhook": { es: "Llamar webhook" },
 };
 
 /**

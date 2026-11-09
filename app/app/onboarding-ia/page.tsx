@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
-import { getT } from "@/lib/i18n/server";
+import { traduzir } from "@/lib/i18n/dicionario";
 import { AutonomousSetupWizard } from "@/components/onboarding/AutonomousSetupWizard";
 
 export const dynamic = "force-dynamic";
 
 export default async function OnboardingIaPage() {
-  const t = await getT();
   const user = await requireAuth();
+  const t = (texto: string) => traduzir(texto, user.idioma);
   const activeOrg = await resolveActiveOrg(user);
 
   if (!activeOrg) {

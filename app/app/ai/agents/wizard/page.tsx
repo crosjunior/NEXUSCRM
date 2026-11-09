@@ -2,15 +2,15 @@ import { redirect } from "next/navigation";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
 import { ROLE_RANK } from "@/lib/auth/types";
 import { obterContextoOrganizacao } from "@/lib/ai/agents/wizard-service";
-import { getT } from "@/lib/i18n/server";
+import { traduzir } from "@/lib/i18n/dicionario";
 import { AgentWizard } from "./AgentWizard";
 import { Sparkles } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function AgentWizardPage() {
-  const t = await getT();
   const user = await requireAuth();
+  const t = (texto: string) => traduzir(texto, user.idioma);
   const activeOrg = await resolveActiveOrg(user);
   if (!activeOrg) redirect("/app");
 
