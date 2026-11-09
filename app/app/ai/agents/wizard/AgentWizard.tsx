@@ -244,7 +244,7 @@ export function AgentWizard({ context }: Props) {
                 ].map((obj) => (
                   <div
                     key={obj.id}
-                    onClick={() => setForm({ ...form, primaryObjective: obj.id as any })}
+                    onClick={() => setForm({ ...form, primaryObjective: obj.id as AgentWizardInput["primaryObjective"] })}
                     className={`cursor-pointer rounded-xl border p-4 transition-all duration-200 ${
                       form.primaryObjective === obj.id
                         ? "border-emerald-500 bg-emerald-500/10 shadow-sm"
@@ -321,7 +321,7 @@ export function AgentWizard({ context }: Props) {
                 ].map((tone) => (
                   <div
                     key={tone.id}
-                    onClick={() => setForm({ ...form, toneOfVoice: tone.id as any })}
+                    onClick={() => setForm({ ...form, toneOfVoice: tone.id as AgentWizardInput["toneOfVoice"] })}
                     className={`cursor-pointer rounded-xl border p-4 transition-all duration-200 ${
                       form.toneOfVoice === tone.id
                         ? "border-emerald-500 bg-emerald-500/10 shadow-sm"
@@ -355,7 +355,7 @@ export function AgentWizard({ context }: Props) {
                 ].map((item) => (
                   <div
                     key={item.id}
-                    onClick={() => setForm({ ...form, useEmojis: item.id as any })}
+                    onClick={() => setForm({ ...form, useEmojis: item.id as AgentWizardInput["useEmojis"] })}
                     className={`flex-1 cursor-pointer rounded-lg border p-3 text-center transition-all ${
                       form.useEmojis === item.id
                         ? "border-emerald-500 bg-emerald-500/10"
@@ -423,7 +423,7 @@ export function AgentWizard({ context }: Props) {
                   },
                 ].map((cap) => {
                   const Icon = cap.icon;
-                  const isChecked = (form.capabilities as any)[cap.key];
+                  const isChecked = (form.capabilities as Record<string, boolean>)[cap.key];
                   return (
                     <div
                       key={cap.key}
@@ -519,7 +519,7 @@ export function AgentWizard({ context }: Props) {
                   desc: "Caso o cliente pergunte diretamente se está falando com um robô ou IA, o assistente confirma de forma simpática e solícita.",
                 },
               ].map((guard) => {
-                const isChecked = (form.guardrails as any)[guard.key];
+                const isChecked = (form.guardrails as Record<string, boolean>)[guard.key];
                 return (
                   <div
                     key={guard.key}
