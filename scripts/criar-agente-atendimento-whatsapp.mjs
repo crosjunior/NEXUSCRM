@@ -82,14 +82,15 @@ async function main() {
 
   // 1. Obter organização
   console.log("🏢 Buscando organização...");
-  const orgRes = await req("/organizations?select=id,name&limit=1");
+  const orgRes = await req("/organizations?select=id,display_name,legal_name&limit=1");
   if (!orgRes.ok || !orgRes.data || orgRes.data.length === 0) {
     console.error("❌ Nenhuma organização encontrada.", orgRes.data);
     process.exit(1);
   }
   const org = orgRes.data[0];
   const orgId = org.id;
-  console.log(`✅ Organização: "${org.name}" (${orgId})`);
+  const orgName = org.display_name || org.legal_name || "Organização";
+  console.log(`✅ Organização: "${orgName}" (${orgId})`);
 
   // 2. Obter canal WhatsApp
   console.log("📱 Buscando conexão de WhatsApp...");
@@ -103,7 +104,7 @@ async function main() {
 
   // 3. Obter bases de conhecimento
   console.log("📚 Buscando bases de conhecimento...");
-  const kbRes = await req(`/ai_knowledge_sources?organization_id=eq.${orgId}&is_active=eq.true&select=id,title`);
+  const kbRes = await req(`/ai_knowledge_sources?organization_id=eq.${orgId}&is_active=eq.true&select=id,name`);
   const knowledgeSourceIds = kbRes.ok && Array.isArray(kbRes.data) ? kbRes.data.map((k) => k.id) : [];
   console.log(`✅ ${knowledgeSourceIds.length} fonte(s) de conhecimento encontrada(s).`);
 
@@ -122,6 +123,9 @@ async function main() {
   let agentId = agentCheck.ok && agentCheck.data?.length > 0 ? agentCheck.data[0].id : null;
 
   if (!agentId) {
+    const defRes = await req(`/ai_agents?organization_id=eq.${orgId}&is_default=eq.true&select=id&limit=1`);
+    const isDefault = !(defRes.ok && defRes.data?.length > 0);
+
     console.log("✨ Criando novo agente...");
     const createAgentRes = await req("/ai_agents", {
       method: "POST",
@@ -134,7 +138,7 @@ async function main() {
         kind: "mcp_agent",
         priority: 10,
         is_active: true,
-        is_default: true,
+        is_default: isDefault,
       }),
     });
 
@@ -158,12 +162,15 @@ async function main() {
 
   // 6. Criar nova versão em ai_agent_versions
   console.log("📝 Criando versão com prompt e ferramentas...");
+  const verCountRes = await req(`/ai_agent_versions?organization_id=eq.${orgId}&agent_id=eq.${agentId}&select=version_number&order=version_number.desc&limit=1`);
+  const nextVer = verCountRes.ok && verCountRes.data?.length > 0 ? verCountRes.data[0].version_number + 1 : 1;
+
   const createVerRes = await req("/ai_agent_versions", {
     method: "POST",
     body: JSON.stringify({
       organization_id: orgId,
       agent_id: agentId,
-      version_number: 1,
+      version_number: nextVer,
       system_prompt: PROMPT_ATENDIMENTO_WHATSAPP,
       provider,
       model,
