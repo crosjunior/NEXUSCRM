@@ -24,8 +24,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "."),
-      "server-only": path.resolve(__dirname, "node_modules/next/dist/compiled/server-only/empty.js"),
+      "@": path.resolve(import.meta.dirname ?? path.resolve("."), "."),
+      "server-only": path.resolve(import.meta.dirname ?? path.resolve("."), "node_modules/next/dist/compiled/server-only/empty.js"),
     },
   },
 });

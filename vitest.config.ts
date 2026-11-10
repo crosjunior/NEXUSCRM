@@ -1,13 +1,15 @@
 import { defineConfig } from "vitest/config";
 import path from "node:path";
 
-import { selecionarCercas } from "./vitest.cercas";
+import { selecionarCercas } from "./vitest.cercas.ts";
+
+const DIRNAME = import.meta.dirname ?? path.resolve(".");
 
 // As guardas estruturais — o arquivo de teste que só lê o repositório (baseline
 // × cadeia, MANIFEST, varredura de anon, docs, workflows, i18n, fragmentos) e
 // não toca DOM; código do produto, só módulo puro. Quem entra é decidido pelo
 // import, em vitest.cercas.ts.
-const CERCAS = selecionarCercas(__dirname);
+const CERCAS = selecionarCercas(DIRNAME);
 
 export default defineConfig({
   // JSX automático já é o default do transform esbuild no Vite 7+ (vitest 4);
@@ -66,10 +68,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "."),
+      "@": path.resolve(DIRNAME, "."),
       // `server-only` não é dependência do projeto: o Next o resolve para o próprio módulo vazio
       // quando o código roda no servidor. Os testes rodam como servidor, então usam o mesmo vazio.
-      "server-only": path.resolve(__dirname, "node_modules/next/dist/compiled/server-only/empty.js"),
+      "server-only": path.resolve(DIRNAME, "node_modules/next/dist/compiled/server-only/empty.js"),
     },
   },
 });

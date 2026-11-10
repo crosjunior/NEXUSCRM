@@ -38,5 +38,5 @@ export default defineConfig({
         "test-service-role-key-not-a-placeholder-1234567890-1234567890",
     },
   },
-  resolve: { alias: { "@": path.resolve(__dirname, ".") } },
+  resolve: { alias: { "@": path.resolve(import.meta.dirname ?? path.resolve("."), ".") } },
 });

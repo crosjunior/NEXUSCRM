@@ -34,6 +34,7 @@ test-results/
 e2e-artifacts/
 
 # IDE / OS
+.antigravity/
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
