@@ -112,6 +112,8 @@ export interface FlowAiData {
   systemPrompt: string;
   conversational: boolean;
   maxTurns: number;
+  agentId?: string | null;
+  knowledgeSourceIds?: string[];
 }
 
 export interface FlowNodeDataMap {

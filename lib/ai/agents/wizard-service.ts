@@ -13,6 +13,7 @@ import { publishAgentVersion } from "@/lib/ai/agents/publish";
 import { audit } from "@/lib/audit";
 import { randomUUID } from "node:crypto";
 import { VALID_TOOL_IDS } from "@/lib/mcp/tools/catalogo";
+import { env } from "@/lib/env";
 
 export interface WizardOrganizationContext {
   organizationId: string;
@@ -94,12 +95,7 @@ async function obterChaveGoogle(organizationId: string): Promise<string | null> 
   }
 
   // 2. Fallback para variáveis de ambiente do servidor
-  return (
-    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-    process.env.GOOGLE_AI_API_KEY ||
-    process.env.GEMINI_API_KEY ||
-    null
-  );
+  return env.GEMINI_API_KEY || null;
 }
 
 /**
@@ -113,18 +109,18 @@ export async function obterContextoOrganizacao(
   const [orgRes, kbRes, pipesRes, stagesRes, channelsRes, credsRes] = await Promise.all([
     admin.from("organizations").select("id, name, niche, settings").eq("id", organizationId).single(),
     admin
-      .from("knowledge_sources")
+      .from("ai_knowledge_sources")
       .select("id, title, description")
       .eq("organization_id", organizationId)
       .is("deleted_at", null)
       .order("created_at", { ascending: true }),
     admin
-      .from("pipelines")
+      .from("crm_pipelines")
       .select("id, name")
       .eq("organization_id", organizationId)
       .order("order_index", { ascending: true }),
     admin
-      .from("pipeline_stages")
+      .from("crm_stages")
       .select("id, name, pipeline_id")
       .eq("organization_id", organizationId)
       .order("order_index", { ascending: true }),
@@ -355,6 +351,16 @@ export async function salvarEPublicarAgenteWizard(params: {
 
   const credentialId = cred?.id ?? null;
 
+  // 1.1 Confere se já existe um agente padrão para respeitar a restrição ai_agents_one_default_per_org
+  const { data: existingDefault } = await admin
+    .from("ai_agents")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("is_default", true)
+    .maybeSingle();
+
+  const isDefaultAgent = !existingDefault;
+
   // 2. Insere na tabela ai_agents
   const { data: agentRow, error: agentErr } = await admin
     .from("ai_agents")
@@ -366,8 +372,8 @@ export async function salvarEPublicarAgenteWizard(params: {
       system_prompt: blueprint.systemPrompt,
       kind: "mcp_agent",
       priority: 10,
-      is_active: false,
-      is_default: true,
+      is_active: true,
+      is_default: isDefaultAgent,
       created_by: userId,
     })
     .select("id")
@@ -443,6 +449,24 @@ export async function salvarEPublicarAgenteWizard(params: {
 
   if (!publishResult.ok) {
     return { ok: false, error: publishResult.message || "Erro ao publicar versão do agente" };
+  }
+
+  // 4.1 Vincula sessão de canal e conversas ativas se informado
+  if (input.channelSessionId) {
+    await admin
+      .from("channel_sessions")
+      .update({
+        metadata: { agent_id: agentRow.id },
+      })
+      .eq("id", input.channelSessionId)
+      .eq("organization_id", organizationId);
+
+    await admin
+      .from("conversations")
+      .update({ active_ai_agent_id: agentRow.id })
+      .eq("channel_session_id", input.channelSessionId)
+      .eq("organization_id", organizationId)
+      .is("active_ai_agent_id", null);
   }
 
   // 5. Registra auditoria

@@ -17,6 +17,10 @@ import {
   RotateCcw,
   Send,
   X,
+  Maximize2,
+  Minimize2,
+  Bot,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +64,8 @@ interface InstagramVisualFlowBuilderProps {
   graph: InstagramFlowGraph;
   onChange: (next: InstagramFlowGraph) => void;
   mediaItems: InstagramMediaItem[];
+  availableAgents?: Array<{ id: string; name: string; is_default?: boolean }>;
+  availableKnowledgeSources?: Array<{ id: string; title: string }>;
 }
 
 const NODE_WIDTH = 280;
@@ -247,6 +253,8 @@ export function InstagramVisualFlowBuilder({
   graph,
   onChange,
   mediaItems,
+  availableAgents = [],
+  availableKnowledgeSources = [],
 }: InstagramVisualFlowBuilderProps) {
   const t = useT();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
@@ -926,6 +934,8 @@ function VisualNodeSideEditor({
           <AiNodeForm
             data={node.data as FlowAiData}
             onChange={onChangeData}
+            availableAgents={availableAgents}
+            availableKnowledgeSources={availableKnowledgeSources}
           />
         )}
 
@@ -1574,42 +1584,225 @@ function DelayNodeForm({
 function AiNodeForm({
   data,
   onChange,
+  availableAgents = [],
+  availableKnowledgeSources = [],
 }: {
   data: FlowAiData;
   onChange: (d: FlowAiData) => void;
+  availableAgents?: Array<{ id: string; name: string; is_default?: boolean }>;
+  availableKnowledgeSources?: Array<{ id: string; title: string }>;
 }) {
   const t = useT();
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Manipulador de paste que garante preservação absoluta da formatação original (quebras de linha, tabs, múltiplos espaços)
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    e.stopPropagation();
+    const text = e.clipboardData.getData("text/plain");
+    if (!text) return;
+    
+    // Insere mantendo quebras de linha normais
+    const target = e.currentTarget;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    const val = target.value;
+    const nextVal = val.substring(0, start) + text + val.substring(end);
+    onChange({ ...data, systemPrompt: nextVal });
+    
+    // Atualiza a posição do cursor após colagem
+    requestAnimationFrame(() => {
+      target.selectionStart = target.selectionEnd = start + text.length;
+    });
+    e.preventDefault();
+  };
+
   return (
     <div className="space-y-3">
+      {/* Seletor de Agente de IA da Empresa */}
       <div>
-        <Label className="text-[11px] text-zinc-600">{t("Instruções e conhecimento da IA")}</Label>
-        <Textarea
-          rows={4}
-          className="mt-1 bg-white text-xs text-zinc-900"
-          value={data.systemPrompt}
-          onChange={(e) => onChange({ ...data, systemPrompt: e.target.value })}
-          placeholder={t("Persona, tom de voz, preços, links...")}
-        />
+        <div className="flex items-center gap-1.5 mb-1">
+          <Bot className="h-3.5 w-3.5 text-violet-600" />
+          <Label className="text-[11px] font-medium text-zinc-700">
+            {t("Agente de IA Responsável")}
+          </Label>
+        </div>
+        <select
+          className="w-full rounded-md border border-zinc-300 bg-white p-1.5 text-xs text-zinc-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+          value={data.agentId ?? ""}
+          onChange={(e) => {
+            const val = e.target.value;
+            onChange({ ...data, agentId: val ? val : null });
+          }}
+        >
+          <option value="">{t("Instruções personalizadas deste nó")}</option>
+          {availableAgents.map((ag) => (
+            <option key={ag.id} value={ag.id}>
+              {ag.name} {ag.is_default ? `(${t("Padrão da Empresa")})` : ""}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-[10px] text-zinc-500">
+          {availableAgents.length > 1
+            ? t("Esta empresa possui múltiplos agentes. Escolha qual irá conduzir as respostas deste bloco.")
+            : t("Selecione um agente ou use instruções personalizadas abaixo.")}
+        </p>
       </div>
-      <label className="flex items-center gap-2 text-xs text-zinc-700">
+
+      {/* Instruções e Conhecimento da IA com botão de expandir */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <Label className="text-[11px] font-medium text-zinc-700">
+            {t("Instruções e conhecimento da IA")}
+          </Label>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(true)}
+            className="h-6 px-1.5 text-[11px] text-violet-700 hover:bg-violet-50 hover:text-violet-800 gap-1"
+            title={t("Expandir editor para melhor visualização")}
+          >
+            <Maximize2 className="h-3 w-3" />
+            <span>{t("Expandir")}</span>
+          </Button>
+        </div>
+        <Textarea
+          rows={5}
+          className="mt-1 bg-white text-xs text-zinc-900 font-mono whitespace-pre-wrap leading-relaxed border-zinc-300 focus:border-violet-500 focus:ring-violet-500"
+          style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", tabSize: 2 }}
+          value={data.systemPrompt}
+          onPaste={handlePaste}
+          onChange={(e) => onChange({ ...data, systemPrompt: e.target.value })}
+          placeholder={t("Cole aqui as instruções, regras de atendimento, tom de voz, preços e links...")}
+        />
+        <div className="mt-1 flex items-center justify-between text-[10px] text-zinc-400">
+          <span>{t("Formatação original e quebras de linha preservadas ao colar")}</span>
+          <span>{data.systemPrompt?.length || 0} {t("caracteres")}</span>
+        </div>
+      </div>
+
+      {/* Base de Conhecimento vinculada */}
+      {availableKnowledgeSources.length > 0 && (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1">
+            <BookOpen className="h-3.5 w-3.5 text-blue-600" />
+            <Label className="text-[11px] font-medium text-zinc-700">
+              {t("Bases de Conhecimento vinculadas")}
+            </Label>
+          </div>
+          <div className="max-h-28 overflow-y-auto rounded-md border border-zinc-200 bg-zinc-50 p-1.5 space-y-1">
+            {availableKnowledgeSources.map((kb) => {
+              const isChecked = (data.knowledgeSourceIds || []).includes(kb.id);
+              return (
+                <label
+                  key={kb.id}
+                  className="flex items-center gap-2 text-xs text-zinc-700 cursor-pointer hover:bg-white p-1 rounded transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={(e) => {
+                      const current = data.knowledgeSourceIds || [];
+                      const next = e.target.checked
+                        ? [...current, kb.id]
+                        : current.filter((id) => id !== kb.id);
+                      onChange({ ...data, knowledgeSourceIds: next });
+                    }}
+                    className="rounded border-zinc-300 text-violet-600 focus:ring-violet-500 h-3.5 w-3.5"
+                  />
+                  <span className="truncate">{kb.title}</span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Modo Conversa */}
+      <label className="flex items-center gap-2 text-xs text-zinc-700 cursor-pointer pt-1">
         <input
           type="checkbox"
           checked={data.conversational}
           onChange={(e) => onChange({ ...data, conversational: e.target.checked })}
+          className="rounded border-zinc-300 text-violet-600 focus:ring-violet-500 h-3.5 w-3.5"
         />
         {t("Modo conversa (responde várias mensagens seguidas)")}
       </label>
       {data.conversational && (
         <div>
-          <Label className="text-[11px] text-zinc-600">{t("Máximo de turnos")}</Label>
+          <Label className="text-[11px] text-zinc-600">{t("Máximo de turnos antes de seguir")}</Label>
           <Input
             type="number"
             min={1}
             max={20}
-            className="mt-1 h-8 bg-white text-xs text-zinc-900"
+            className="mt-1 h-8 bg-white text-xs text-zinc-900 border-zinc-300"
             value={data.maxTurns}
             onChange={(e) => onChange({ ...data, maxTurns: Number(e.target.value) })}
           />
+        </div>
+      )}
+
+      {/* MODAL EXPANDIDO DE EDIÇÃO DO PROMPT DA IA */}
+      {isExpanded && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative flex flex-col h-[85vh] w-full max-w-4xl rounded-xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl text-zinc-100">
+            {/* Header do Modal */}
+            <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-950/60 border border-violet-800/40 text-violet-400">
+                  <Bot className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">
+                    {t("Editor Expandido de Instruções do Agente de IA")}
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    {t("Formatação, quebras de linha e tabulações mantidas exatamente como coladas.")}
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsExpanded(false)}
+                className="h-8 w-8 p-0 text-zinc-400 hover:bg-zinc-800 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Corpo do Editor */}
+            <div className="flex-1 py-4 flex flex-col">
+              <Textarea
+                autoFocus
+                className="flex-1 w-full resize-none rounded-lg border border-zinc-800 bg-zinc-900/80 p-4 font-mono text-xs text-zinc-100 leading-relaxed focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", tabSize: 2 }}
+                value={data.systemPrompt}
+                onPaste={handlePaste}
+                onChange={(e) => onChange({ ...data, systemPrompt: e.target.value })}
+                placeholder={t("Cole ou digite aqui as instruções completas do seu agente de IA...")}
+              />
+            </div>
+
+            {/* Rodapé do Modal */}
+            <div className="flex items-center justify-between pt-4 border-t border-zinc-800 text-xs text-zinc-400">
+              <div className="flex items-center gap-4">
+                <span>{data.systemPrompt?.length || 0} {t("caracteres")}</span>
+                <span>{(data.systemPrompt?.split("\n").length) || 0} {t("linhas")}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsExpanded(false)}
+                  className="border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700"
+                >
+                  <Minimize2 className="h-3.5 w-3.5 mr-1" />
+                  {t("Concluir Edição")}
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

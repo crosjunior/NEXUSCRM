@@ -14,6 +14,7 @@ import * as React from "react";
 
 import { AvisoDaConexaoGoogle } from "./_components/AvisoDaConexaoGoogle";
 import { CartaoDaConexaoGoogle } from "./_components/CartaoDaConexaoGoogle";
+import { CartaoDaConexaoOutlook } from "./_components/CartaoDaConexaoOutlook";
 
 import { AgendaInterativa } from "@/components/agenda/AgendaInterativa";
 import { ReservasColetivas } from "@/components/agenda/ReservasColetivas";
@@ -538,13 +539,16 @@ export function AgendaClient({
         <EntradaDaAgenda onContext={onContext} />
       </React.Suspense>
 
-      <CartaoDaConexaoGoogle
-        configurado={googleConfigurado}
-        falta={faltaNoGoogle}
-        linkDeConfiguracao={linkDeConfiguracaoDoGoogle}
-        contaConectada={contaConectada}
-        enderecoDeRetorno={enderecoDeRetorno}
-      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <CartaoDaConexaoGoogle
+          configurado={googleConfigurado}
+          falta={faltaNoGoogle}
+          linkDeConfiguracao={linkDeConfiguracaoDoGoogle}
+          contaConectada={contaConectada}
+          enderecoDeRetorno={enderecoDeRetorno}
+        />
+        <CartaoDaConexaoOutlook />
+      </div>
 
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="min-w-0">

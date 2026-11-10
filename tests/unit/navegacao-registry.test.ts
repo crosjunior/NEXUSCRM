@@ -84,8 +84,9 @@ describe("sidebarGroups", () => {
 
   it("só inclui destino marcado como sidebar", () => {
     const hrefs = sidebarGroups(true, null).flatMap((g) => g.items.map((i) => i.href));
-    // Conhecimento existe no registro, mas é do hub — não do sidebar.
-    expect(hrefs).not.toContain("/app/ai/knowledge/sources");
+    // Memória existe no registro, mas é do hub — não do sidebar. Base de Conhecimento e Agentes estão no sidebar.
+    expect(hrefs).not.toContain("/app/ai/memory");
+    expect(hrefs).toContain("/app/ai/knowledge/sources");
     expect(hrefs).toContain("/app/ai/agents");
   });
 

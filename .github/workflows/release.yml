@@ -99,7 +99,7 @@ jobs:
             --title "Release ${VERSAO}" --body-file /tmp/corpo.md
 
   cortar-tag:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && secrets.RELEASE_APP_ID != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -630,12 +630,13 @@ export const NAV_CATALOG = [
   },
   {
     href: "/app/ai/knowledge/sources",
-    label: "Conhecimento",
+    label: "Base de Conhecimento",
     description: "Os materiais que o agente consulta antes de responder sobre o seu negócio.",
     icon: "BookOpen",
     group: "ia",
     section: "Ensinar o agente",
     minRole: "manager",
+    sidebar: true,
   },
   {
     href: "/app/ai/memory",

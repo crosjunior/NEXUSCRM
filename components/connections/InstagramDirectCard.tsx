@@ -50,6 +50,7 @@ interface InstagramState {
   }>;
   webhook_url: string;
   webhook_verify_token: string;
+  oauth_redirect_uri?: string;
 }
 
 function formatMediaDate(iso: string, tagIdioma: string): string {
@@ -917,6 +918,7 @@ export function InstagramDirectCard() {
                     setRuleForm((prev) => ({ ...prev, flow_graph: nextGraph }))
                   }
                   mediaItems={allMediaItems}
+                  availableAgents={state.available_agents}
                 />
               ) : (
                 <>
@@ -1254,7 +1256,7 @@ export function InstagramDirectCard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
           <div className="space-y-1">
-            <span className="text-muted-foreground">{t("URL de Retorno de Chamada (Callback URL):")}</span>
+            <span className="text-muted-foreground">{t("URL de Retorno de Chamada do Webhook:")}</span>
             <div className="flex items-center gap-2">
               <Input readOnly value={state?.webhook_url || ""} className="font-mono text-xs h-8 bg-background" />
               <Button
@@ -1269,7 +1271,7 @@ export function InstagramDirectCard() {
           </div>
 
           <div className="space-y-1">
-            <span className="text-muted-foreground">{t("Token de Verificação (Verify Token):")}</span>
+            <span className="text-muted-foreground">{t("Token de Verificação do Webhook:")}</span>
             <div className="flex items-center gap-2">
               <Input
                 readOnly
@@ -1281,6 +1283,33 @@ export function InstagramDirectCard() {
                 variant="outline"
                 className="h-8"
                 onClick={() => state?.webhook_verify_token && copyToClipboard(state.webhook_verify_token, "Token de Verificação")}
+              >
+                {t("Copiar")}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-1 md:col-span-2 pt-1 border-t border-border/40">
+            <span className="text-muted-foreground font-medium text-amber-500">
+              {t("URI de Redirecionamento de OAuth Válido (Meta Login for Business):")}
+            </span>
+            <p className="text-[11px] text-muted-foreground">
+              {t("Adicione exatamente este endereço em: Meta Developers → Seu App → Login do Facebook / Configurações → URIs de redirecionamento do OAuth válidos:")}
+            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <Input
+                readOnly
+                value={state?.oauth_redirect_uri || (typeof window !== "undefined" ? `${window.location.origin}/api/v1/channels/instagram/callback` : "")}
+                className="font-mono text-xs h-8 bg-background"
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 shrink-0 text-amber-500 border-amber-500/40 hover:bg-amber-500/10"
+                onClick={() => {
+                  const uri = state?.oauth_redirect_uri || `${window.location.origin}/api/v1/channels/instagram/callback`;
+                  copyToClipboard(uri, "URI de Redirecionamento OAuth");
+                }}
               >
                 {t("Copiar")}
               </Button>

@@ -243,6 +243,8 @@ export async function GET() {
       status: ag.is_active ? "published" : "paused",
     }));
 
+    const oauthRedirectUri = `${appUrl}/api/v1/channels/instagram/callback`;
+
     return ok({
       connected: Boolean(account),
       account,
@@ -253,6 +255,7 @@ export async function GET() {
       available_agents: mappedAgents,
       webhook_url: webhookUrl,
       webhook_verify_token: creds.verifyToken,
+      oauth_redirect_uri: oauthRedirectUri,
       has_custom_credentials: false,
     });
   } catch (err) {

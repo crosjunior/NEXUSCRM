@@ -23,6 +23,12 @@ import {
   Image as ImageIcon,
   Type,
   Search,
+  ChevronDown,
+  ChevronUp,
+  Bot,
+  MessageSquare,
+  RefreshCw,
+  Sliders,
 } from "lucide-react";
 import { useT } from "@/hooks/i18n/useT";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -36,10 +42,80 @@ import type {
   AutonomousExtractionOutput,
 } from "@/lib/onboarding/autonomous-types";
 
+export interface AutonomousSetupInitialConfig {
+  organizationId: string;
+  orgName: string;
+  slug: string;
+  branding: {
+    appName: string;
+    accentHex: string;
+    primaryColor: string;
+    secondaryColor: string;
+    colors: string[];
+    fontPrimary: string;
+    fontSecondary: string;
+    logoUrl: string | null;
+    websiteUrl: string;
+    instagram: string;
+  };
+  agents: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    model: string | null;
+    system_prompt: string | null;
+    is_active: boolean;
+    is_default: boolean;
+    published_version_id: string | null;
+    paused_at: string | null;
+    created_at?: string;
+  }>;
+  defaultAgent: {
+    id: string;
+    name: string;
+    description: string | null;
+    model: string | null;
+    system_prompt: string | null;
+    is_active: boolean;
+    is_default: boolean;
+    published_version_id: string | null;
+    paused_at: string | null;
+    created_at?: string;
+  } | null;
+  knowledgeSources: Array<{
+    id: string;
+    name: string;
+    source_type: string;
+    source_metadata: Record<string, unknown> | null;
+    is_active: boolean;
+    chunks_count: number | null;
+    created_at?: string;
+  }>;
+  pipelines: Array<{
+    id: string;
+    name: string;
+    crm_stages: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      position: number;
+      is_won?: boolean;
+      is_lost?: boolean;
+    }>;
+  }>;
+  channels: Array<{
+    id: string;
+    provider: string;
+    status: string;
+    display_name: string | null;
+  }>;
+}
+
 interface Props {
   organizationId: string;
   initialOrgName?: string;
   initialSlug?: string;
+  initialConfig?: AutonomousSetupInitialConfig;
   onFinishedRedirect?: string;
 }
 
@@ -82,18 +158,28 @@ const FONTES_GOOGLE_TEXTOS = [
 ];
 
 export function AutonomousSetupWizard({
+  initialOrgName = "",
+  initialSlug = "",
+  initialConfig,
   onFinishedRedirect = "/app/inbox",
 }: Props) {
   const t = useT();
   const [step, setStep] = useState<WizardStep>("upload");
-  const [websiteUrl, setWebsiteUrl] = useState("");
-  const [instagram, setInstagram] = useState("");
+  const [showReconfigureForm, setShowReconfigureForm] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [websiteUrl, setWebsiteUrl] = useState(() => initialConfig?.branding?.websiteUrl || "");
+  const [instagram, setInstagram] = useState(() => initialConfig?.branding?.instagram || "");
   const [googleMapsUrl, setGoogleMapsUrl] = useState("");
   const [driveLinks, setDriveLinks] = useState("");
   const [freeformNotes, setFreeformNotes] = useState("");
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(() => initialConfig?.branding?.logoUrl || null);
   const [files, setFiles] = useState<Array<{ name: string; type: string; size?: number; text?: string; base64_data?: string }>>([]);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  const isConfigured = Boolean(
+    initialConfig?.defaultAgent ||
+      (initialConfig?.branding?.appName && initialConfig.branding.appName !== "Minha Empresa"),
+  );
 
   // Estado da extração e edição
   const [blueprint, setBlueprint] = useState<AutonomousExtractionOutput | null>(null);
@@ -454,9 +540,225 @@ export function AutonomousSetupWizard({
         </p>
       </div>
 
+      {/* RESUMO DE EMPRESA JÁ CONFIGURADA */}
+      {isConfigured && !showReconfigureForm && step === "upload" && (
+        <div className="space-y-6">
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0">
+                <CheckCircle2 className="size-8" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xl font-bold tracking-tight">
+                    {initialConfig?.branding?.appName || initialOrgName}
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
+                    {t("Ativo e Operando")}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t("Identidade visual, regras de negócio, funil e agente de IA estão configurados e respondendo aos canais.")}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowReconfigureForm(true)}
+                className="gap-1.5"
+              >
+                <RefreshCw className="size-3.5" />
+                <span>{t("Atualizar com Novos Materiais")}</span>
+              </Button>
+              <Button asChild size="sm" className="bg-primary text-primary-foreground gap-1.5">
+                <a href={onFinishedRedirect}>
+                  <MessageSquare className="size-3.5" />
+                  <span>{t("Testar no Chat (Inbox)")}</span>
+                </a>
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* CARD DO AGENTE DE IA */}
+            <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-semibold text-sm">
+                  <Bot className="size-4 text-primary" />
+                  <span>{t("Agente de IA Atendente")}</span>
+                </div>
+                <a href="/app/ai/agents" className="text-xs text-primary hover:underline font-medium flex items-center gap-1">
+                  <span>{t("Gerenciar Agentes")}</span>
+                  <ExternalLink className="size-3" />
+                </a>
+              </div>
+
+              <div className="p-3 rounded-lg border border-border bg-surface/50 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-foreground">
+                    {initialConfig?.defaultAgent?.name || `${initialConfig?.branding?.appName} Atendente`}
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary">
+                    {initialConfig?.defaultAgent?.published_version_id ? t("Publicado") : t("Pronto")}
+                  </span>
+                </div>
+                <div className="text-muted-foreground">
+                  <span>{t("Modelo:")} </span>
+                  <span className="font-mono text-foreground">{initialConfig?.defaultAgent?.model || "google/gemini-2.5-flash"}</span>
+                </div>
+
+                {initialConfig?.defaultAgent?.system_prompt && (
+                  <div className="pt-2 border-t border-border">
+                    <button
+                      type="button"
+                      onClick={() => setPromptOpen(!promptOpen)}
+                      className="text-primary hover:underline font-medium text-xs flex items-center gap-1 w-full justify-between"
+                    >
+                      <span>{promptOpen ? t("Ocultar Prompt / Persona") : t("Ver Prompt / Persona do Agente")}</span>
+                      {promptOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                    </button>
+                    {promptOpen && (
+                      <div className="mt-2 max-h-48 overflow-y-auto p-2.5 rounded bg-background border border-border text-[11px] font-mono whitespace-pre-wrap text-muted-foreground">
+                        {initialConfig.defaultAgent.system_prompt}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* CARD DA MARCA E IDENTIDADE */}
+            <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-semibold text-sm">
+                  <Palette className="size-4 text-primary" />
+                  <span>{t("Marca e Identidade Visual")}</span>
+                </div>
+                <a href="/app/settings/marca" className="text-xs text-primary hover:underline font-medium flex items-center gap-1">
+                  <span>{t("Configurar Marca")}</span>
+                  <ExternalLink className="size-3" />
+                </a>
+              </div>
+
+              <div className="p-3 rounded-lg border border-border bg-surface/50 space-y-3 text-xs">
+                <div className="flex items-center gap-3">
+                  {initialConfig?.branding?.logoUrl ? (
+                    <img
+                      src={initialConfig.branding.logoUrl}
+                      alt="Logo"
+                      className="size-10 object-contain rounded border border-border bg-background p-0.5"
+                    />
+                  ) : (
+                    <div className="size-10 rounded border border-border bg-primary/10 text-primary font-bold flex items-center justify-center text-sm">
+                      {(initialConfig?.branding?.appName || initialOrgName).slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-semibold text-foreground">{initialConfig?.branding?.appName || initialOrgName}</p>
+                    <p className="text-[11px] text-muted-foreground">{t("Tipografia:")} {initialConfig?.branding?.fontPrimary} / {initialConfig?.branding?.fontSecondary}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <span className="text-[11px] text-muted-foreground font-medium">{t("Paleta de Cores Ativa:")}</span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(initialConfig?.branding?.colors || ["#001b4a", "#e1b63c", "#009fe3"]).map((c, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded border border-border bg-background text-[10px] font-mono"
+                      >
+                        <span className="size-2.5 rounded-full" style={{ backgroundColor: c }} />
+                        <span>{c}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* CARD DA BASE DE CONHECIMENTO */}
+            <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-semibold text-sm">
+                  <FileText className="size-4 text-primary" />
+                  <span>{t("Base de Conhecimento")}</span>
+                </div>
+                <a href="/app/ai/knowledge/sources" className="text-xs text-primary hover:underline font-medium flex items-center gap-1">
+                  <span>{t("Ver Documentos")}</span>
+                  <ExternalLink className="size-3" />
+                </a>
+              </div>
+
+              <div className="p-3 rounded-lg border border-border bg-surface/50 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{t("Fontes de Conhecimento:")}</span>
+                  <span className="font-semibold text-foreground">
+                    {initialConfig?.knowledgeSources?.length || 0} {t("base(s) ativa(s)")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{t("Trechos Indexados (RAG):")}</span>
+                  <span className="font-semibold text-foreground">
+                    {initialConfig?.knowledgeSources?.reduce((acc, k) => acc + (k.chunks_count || 0), 0) || 0} {t("chunks")}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* CARD DE CANAIS E FUNIS */}
+            <div className="rounded-xl border bg-card p-5 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-semibold text-sm">
+                  <Layers className="size-4 text-primary" />
+                  <span>{t("Funil e Canais de Comunicação")}</span>
+                </div>
+                <a href="/app/connections" className="text-xs text-primary hover:underline font-medium flex items-center gap-1">
+                  <span>{t("Conexões")}</span>
+                  <ExternalLink className="size-3" />
+                </a>
+              </div>
+
+              <div className="p-3 rounded-lg border border-border bg-surface/50 space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{t("Funil Comercial:")}</span>
+                  <span className="font-semibold text-foreground">
+                    {initialConfig?.pipelines?.[0]?.name || t("Funil Comercial")}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{t("Canais Conectados:")}</span>
+                  <span className="font-semibold text-foreground">
+                    {initialConfig?.channels?.length || 0} {t("canal(is) vinculado(s)")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ETAPA 1: ENVIO DE MATERIAIS */}
-      {step === "upload" && (
+      {step === "upload" && (!isConfigured || showReconfigureForm) && (
         <div className="rounded-xl border bg-card p-6 shadow-sm space-y-6">
+          {isConfigured && (
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <span className="text-xs font-semibold text-primary uppercase tracking-wider">
+                {t("Atualizar Dados e Regras da Empresa")}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowReconfigureForm(false)}
+                className="text-xs"
+              >
+                {t("← Voltar ao Resumo")}
+              </Button>
+            </div>
+          )}
+
           {/* Logo Dedicado */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5 font-semibold text-sm">
