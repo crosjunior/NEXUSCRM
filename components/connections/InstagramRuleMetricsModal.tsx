@@ -63,8 +63,13 @@ export function InstagramRuleMetricsModal({
   );
 
   const ruleLogs = useMemo(
-    () => executions.filter((e) => e.rule_id === rule.id),
-    [executions, rule.id],
+    () =>
+      executions.filter(
+        (e) =>
+          e.rule_id === rule.id ||
+          (Boolean(e.rule_name) && Boolean(rule.name) && e.rule_name === rule.name),
+      ),
+    [executions, rule.id, rule.name],
   );
 
   const filteredLogs = useMemo(() => {

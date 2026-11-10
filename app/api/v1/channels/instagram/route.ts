@@ -165,7 +165,7 @@ function normalizeRule(
 
 export async function GET() {
   const requestId = randomUUID();
-  const auth = await requireRole("admin", { requestId, resource: "instagram_channel" });
+  const auth = await requireRole("manager", { requestId, resource: "instagram_channel" });
   if (!auth.ok) return auth.response;
 
   const orgId = auth.org.orgId;
@@ -270,7 +270,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const requestId = randomUUID();
-  const auth = await requireRole("admin", { requestId, resource: "instagram_channel" });
+  const auth = await requireRole("manager", { requestId, resource: "instagram_channel" });
   if (!auth.ok) return auth.response;
 
   const orgId = auth.org.orgId;

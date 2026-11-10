@@ -279,11 +279,20 @@ async function recordRuleExecution(
     rule_executions: nextLogs,
   };
 
-  await db
+  const { error: updateErr } = await db
     .from("channel_sessions")
     .update({ metadata: nextMetadata, updated_at: nowIso })
     .eq("id", sessionId)
     .eq("organization_id", orgId);
+
+  if (updateErr) {
+    logger.error("[instagram.webhook] Erro ao gravar execução da regra no banco", {
+      sessionId,
+      orgId,
+      ruleId,
+      erro: updateErr.message,
+    });
+  }
 
   metadata.keyword_rules = updatedRules;
   metadata.rule_executions = nextLogs;
@@ -520,83 +529,116 @@ export async function processInstagramWebhookEvent(
   // 2. Trata Cliques em Botões (Postbacks) de Fluxos Visuais ManyChat/NexusReply
   // -------------------------------------------------------------------------
   if (event.kind === "postback") {
-    const decoded = decodeFlowPayload(event.payload);
-    if (decoded) {
-      const rule = keywordRules.find((r) => r.id === decoded.ruleId);
-      if (rule && rule.flow_graph?.nodes?.length) {
-        const profile = await getInstagramUserProfile(creds, token, event.senderId);
-        const username = profile?.username || `user_${event.senderId.slice(-4)}`;
-        const fullName = profile?.name || null;
-        const isFollower =
-          typeof profile?.is_user_follow_business === "boolean"
-            ? profile.is_user_follow_business
-            : null;
+    let decoded = decodeFlowPayload(event.payload);
+    let rule = decoded ? keywordRules.find((r) => r.id === decoded!.ruleId) : null;
+    let targetNodeId = decoded?.nodeId;
+    let targetHandleId = decoded?.handleId;
 
-        const contactSnap: FlowContactSnapshot = {
-          username,
-          name: fullName,
-          is_follower: isFollower,
-          follower_count: profile?.follower_count ?? null,
-          tags: [],
-          fields: {},
-        };
-
-        try {
-          const pbEvent: FlowEngineEvent = {
-            type: "postback",
-            nodeId: decoded.nodeId,
-            handleId: decoded.handleId,
-          };
-          const out = advanceFlow(
-            rule.flow_graph,
-            createFlowState(rule.id),
-            { contact: contactSnap, entry: { type: "dm", text: event.title } },
-            pbEvent,
-          );
-          const execSummary = await runVisualFlowEffects({
-            creds,
-            token,
-            igUserId: event.igUserId,
-            senderId: event.senderId,
-            ruleId: rule.id,
-            effects: out.effects,
-          });
-
-          await recordRuleExecution(
-            db,
-            session.id,
-            orgId,
-            metadata,
-            rule.id,
-            {
-              rule_id: rule.id,
-              rule_name: rule.name ?? null,
-              trigger_type: "postback",
-              ig_user_id: event.senderId,
-              username,
-              full_name: fullName,
-              profile_pic: profile?.profile_pic ?? null,
-              is_follower: isFollower,
-              follower_count: profile?.follower_count ?? null,
-              is_verified: profile?.is_verified_user ?? null,
-              comment_or_message_text: `[Botão clicado] ${event.title}`,
-              public_reply_sent: null,
-              dm_sent: execSummary.dmTexts.join("\n\n") || null,
-              buttons_sent: execSummary.buttonsSent,
-              actions_executed: execSummary.actionsExecuted,
-              status: "dm_only",
-            },
-            {
-              dmSent: execSummary.dmTexts.length > 0 ? 1 : 0,
-              buttonClick: 1,
-            },
-          );
-        } catch (err) {
-          logger.error("[instagram.webhook] Falha ao processar postback do fluxo visual", {
-            senderId: event.senderId,
-            erro: err instanceof Error ? err.message : String(err),
-          });
+    // Se o payload não veio codificado (ou o ID da regra mudou), faz busca flexível pelo título do botão
+    if (!rule && (event.title || event.payload)) {
+      const matchText = (event.title || event.payload).trim().toLowerCase();
+      for (const r of keywordRules) {
+        if (!r.active || !r.flow_graph?.nodes?.length) continue;
+        for (const n of r.flow_graph.nodes) {
+          if (n.type === "message") {
+            const d = n.data as import("./flow-engine").FlowMessageData;
+            const btn = (d.buttons ?? []).find(
+              (b) => b.id === event.payload || b.title.trim().toLowerCase() === matchText,
+            );
+            if (btn) {
+              rule = r;
+              targetNodeId = n.id;
+              targetHandleId = btn.id;
+              break;
+            }
+            const qr = (d.quickReplies ?? []).find(
+              (q) => q.id === event.payload || q.title.trim().toLowerCase() === matchText,
+            );
+            if (qr) {
+              rule = r;
+              targetNodeId = n.id;
+              targetHandleId = qr.id;
+              break;
+            }
+          }
         }
+        if (rule) break;
+      }
+    }
+
+    if (rule && rule.flow_graph?.nodes?.length && targetNodeId && targetHandleId) {
+      const profile = await getInstagramUserProfile(creds, token, event.senderId);
+      const username = profile?.username || `user_${event.senderId.slice(-4)}`;
+      const fullName = profile?.name || null;
+      const isFollower =
+        typeof profile?.is_user_follow_business === "boolean"
+          ? profile.is_user_follow_business
+          : null;
+
+      const contactSnap: FlowContactSnapshot = {
+        username,
+        name: fullName,
+        is_follower: isFollower,
+        follower_count: profile?.follower_count ?? null,
+        tags: [],
+        fields: {},
+      };
+
+      try {
+        const pbEvent: FlowEngineEvent = {
+          type: "postback",
+          nodeId: targetNodeId,
+          handleId: targetHandleId,
+        };
+        const out = advanceFlow(
+          rule.flow_graph,
+          createFlowState(rule.id),
+          { contact: contactSnap, entry: { type: "dm", text: event.title } },
+          pbEvent,
+        );
+        const execSummary = await runVisualFlowEffects({
+          creds,
+          token,
+          igUserId: event.igUserId,
+          senderId: event.senderId,
+          ruleId: rule.id,
+          effects: out.effects,
+        });
+
+        await recordRuleExecution(
+          db,
+          session.id,
+          orgId,
+          metadata,
+          rule.id,
+          {
+            rule_id: rule.id,
+            rule_name: rule.name ?? null,
+            trigger_type: "postback",
+            ig_user_id: event.senderId,
+            username,
+            full_name: fullName,
+            profile_pic: profile?.profile_pic ?? null,
+            is_follower: isFollower,
+            follower_count: profile?.follower_count ?? null,
+            is_verified: profile?.is_verified_user ?? null,
+            comment_or_message_text: `[Botão clicado] ${event.title || event.payload}`,
+            public_reply_sent: null,
+            dm_sent: execSummary.dmTexts.join("\n\n") || null,
+            buttons_sent: execSummary.buttonsSent,
+            actions_executed: execSummary.actionsExecuted,
+            status: "dm_only",
+          },
+          {
+            dmSent: execSummary.dmTexts.length > 0 ? 1 : 0,
+            buttonClick: 1,
+          },
+        );
+      } catch (err) {
+        logger.error("[instagram.webhook] Falha ao processar postback do fluxo visual", {
+          senderId: event.senderId,
+          erro: err instanceof Error ? err.message : String(err),
+        });
       }
     }
     return { status: "processed" };
@@ -686,6 +728,98 @@ export async function processInstagramWebhookEvent(
         }
       }
     } else {
+      // 3.0.1 Verifica se o texto enviado é o clique de um botão ou resposta rápida de um fluxo visual
+      const cleanText = text.trim().toLowerCase();
+      let flowButtonMatch: {
+        rule: InstagramKeywordRule;
+        nodeId: string;
+        buttonId: string;
+        title: string;
+      } | null = null;
+
+      if (cleanText) {
+        for (const r of keywordRules) {
+          if (!r.active || !r.flow_graph?.nodes?.length) continue;
+          for (const n of r.flow_graph.nodes) {
+            if (n.type === "message") {
+              const d = n.data as import("./flow-engine").FlowMessageData;
+              const btn = (d.buttons ?? []).find(
+                (b) => b.type === "postback" && b.title.trim().toLowerCase() === cleanText,
+              );
+              if (btn) {
+                flowButtonMatch = { rule: r, nodeId: n.id, buttonId: btn.id, title: btn.title };
+                break;
+              }
+              const qr = (d.quickReplies ?? []).find(
+                (q) => q.title.trim().toLowerCase() === cleanText,
+              );
+              if (qr) {
+                flowButtonMatch = { rule: r, nodeId: n.id, buttonId: qr.id, title: qr.title };
+                break;
+              }
+            }
+          }
+          if (flowButtonMatch) break;
+        }
+      }
+
+      if (flowButtonMatch) {
+        const { rule: fRule, nodeId: fNodeId, buttonId: fButtonId, title: fTitle } = flowButtonMatch;
+        try {
+          const out = advanceFlow(
+            fRule.flow_graph!,
+            createFlowState(fRule.id),
+            { contact: contactSnap, entry: { type: "dm", text } },
+            { type: "postback", nodeId: fNodeId, handleId: fButtonId },
+          );
+          const execSummary = await runVisualFlowEffects({
+            creds,
+            token,
+            igUserId: event.igUserId,
+            senderId: event.senderId,
+            ruleId: fRule.id,
+            effects: out.effects,
+          });
+
+          await recordRuleExecution(
+            db,
+            session.id,
+            orgId,
+            metadata,
+            fRule.id,
+            {
+              rule_id: fRule.id,
+              rule_name: fRule.name ?? null,
+              trigger_type: "postback",
+              ig_user_id: event.senderId,
+              username,
+              full_name: fullName,
+              profile_pic: profile?.profile_pic ?? null,
+              is_follower: isFollower,
+              follower_count: profile?.follower_count ?? null,
+              is_verified: profile?.is_verified_user ?? null,
+              comment_or_message_text: `[Botão clicado via DM] ${fTitle}`,
+              public_reply_sent: null,
+              dm_sent: execSummary.dmTexts.join("\n\n") || null,
+              buttons_sent: execSummary.buttonsSent,
+              actions_executed: execSummary.actionsExecuted,
+              status: "dm_only",
+            },
+            {
+              dmSent: execSummary.dmTexts.length > 0 ? 1 : 0,
+              buttonClick: 1,
+            },
+          );
+          return { status: "processed" };
+        } catch (err) {
+          logger.error("[instagram.webhook] Falha ao processar avanço de fluxo por texto do botão", {
+            senderId: event.senderId,
+            buttonTitle: fTitle,
+            erro: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
       // 3.1 Verifica regra de palavra-chave para story_mention ou dm_keyword
       let matchedRule: InstagramKeywordRule | null = null;
       let triggeredType: "story_mention" | "dm_keyword" = "dm_keyword";

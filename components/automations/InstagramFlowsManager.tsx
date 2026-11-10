@@ -137,11 +137,14 @@ export function InstagramFlowsManager() {
   const saveRulesMutation = useMutation({
     mutationFn: async (keyword_rules: InstagramKeywordRule[]) => {
       const res = await fetch("/api/v1/channels/instagram", {
-        method: "PATCH",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyword_rules }),
+        body: JSON.stringify({ action: "save_keywords", rules: keyword_rules }),
       });
-      if (!res.ok) throw new Error("Falha ao salvar regras");
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error?.message || errJson.message || "Falha ao salvar regras");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -159,11 +162,14 @@ export function InstagramFlowsManager() {
   const clearLogsMutation = useMutation({
     mutationFn: async (ruleId?: string) => {
       const res = await fetch("/api/v1/channels/instagram", {
-        method: "DELETE",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clear_rule_id: ruleId }),
+        body: JSON.stringify({ action: "clear_rule_logs", rule_id: ruleId }),
       });
-      if (!res.ok) throw new Error("Falha ao limpar histórico");
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error?.message || errJson.message || "Falha ao limpar histórico");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -920,7 +926,7 @@ export function InstagramFlowsManager() {
 
                         {/* Estatísticas resumidas da regra */}
                         <div className="flex items-center gap-4 text-[11px] text-muted-foreground pt-1">
-                          <span>{rule.stats?.triggers_count || 0} {t("acionamentos")}</span>
+                          <span>{rule.stats?.total_triggers || rule.stats?.comments_count || 0} {t("acionamentos")}</span>
                           <span>{rule.stats?.dms_sent_count || 0} {t("respostas")}</span>
                           <span>{rule.stats?.followers_count || 0} {t("seguidores")}</span>
                         </div>
