@@ -12,28 +12,29 @@ export async function POST() {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
 
-  const authz = await requireRole("agent", { requestId });
+  const authz = await requireRole("agent", { requestId, resource: "calendar_connections" });
   if (!authz.ok) return authz.response;
+  const { user, org } = authz;
 
   const admin = createAdminClient();
 
   const { error } = await admin
     .from("calendar_connections")
     .delete()
-    .eq("organization_id", authz.orgId)
-    .eq("user_id", authz.userId)
+    .eq("organization_id", org.orgId)
+    .eq("user_id", user.id)
     .eq("provider", "outlook");
 
   if (error) {
-    return fail("database_error", "Falha ao desconectar conta Outlook.", 500, { requestId });
+    return fail("internal_error", "Falha ao desconectar conta Outlook.", 500, { requestId });
   }
 
   void audit({
-    action: "calendar.disconnected",
-    actorUserId: authz.userId,
-    organizationId: authz.orgId,
-    resourceType: "calendar_connection",
-    resourceId: "outlook",
+    action: "agenda.outlook.conexao_desconectada",
+    actorUserId: user.id,
+    organizationId: org.orgId,
+    resourceType: "calendar_connections",
+    metadata: { provider: "outlook" },
     requestId,
   });
 

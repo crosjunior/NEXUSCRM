@@ -37,11 +37,27 @@ import {
   extractRuleSummaryFromGraph,
 } from "@/lib/channels/instagram/flow-engine";
 import type {
-  InstagramChannelState,
   InstagramKeywordRule,
   InstagramMediaItem,
   InstagramRuleExecutionLog,
 } from "@/lib/channels/instagram/types";
+
+/** Forma da resposta de `GET /api/v1/channels/instagram` consumida aqui. */
+interface InstagramChannelState {
+  connected: boolean;
+  account: {
+    id: string;
+    accountId: string;
+    username: string;
+    name?: string | null;
+    profilePicture?: string | null;
+  } | null;
+  agent_id: string | null;
+  keyword_rules: InstagramKeywordRule[];
+  rule_executions?: InstagramRuleExecutionLog[];
+  media_items: InstagramMediaItem[];
+  available_agents: Array<{ id: string; name: string; role: string; status: string }>;
+}
 
 function formatMediaDate(iso: string, tagIdioma: string): string {
   const d = new Date(iso);
