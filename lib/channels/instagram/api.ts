@@ -388,15 +388,33 @@ export async function sendInstagramRichMessage(
       ? `https://graph.facebook.com/${creds.graphVersion}/${opts.igUserId}/messages`
       : `https://graph.facebook.com/${creds.graphVersion}/me/messages`;
 
-  return call<{ message_id: string }>(url, {
-    method: "POST",
-    token,
-    body: JSON.stringify({
-      recipient,
-      message: messagePayload,
-      ...(opts.humanAgent ? { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" } : {}),
-    }),
-  });
+  try {
+    return await call<{ message_id: string }>(url, {
+      method: "POST",
+      token,
+      body: JSON.stringify({
+        recipient,
+        message: messagePayload,
+        ...(opts.humanAgent ? { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" } : {}),
+      }),
+    });
+  } catch (err) {
+    if (url.includes(opts.igUserId || "")) {
+      return await call<{ message_id: string }>(
+        `https://graph.facebook.com/${creds.graphVersion}/me/messages`,
+        {
+          method: "POST",
+          token,
+          body: JSON.stringify({
+            recipient,
+            message: messagePayload,
+            ...(opts.humanAgent ? { messaging_type: "MESSAGE_TAG", tag: "HUMAN_AGENT" } : {}),
+          }),
+        },
+      );
+    }
+    throw err;
+  }
 }
 
 /** Envia mensagem direta (DM) no Instagram */

@@ -88,6 +88,7 @@ describe("sidebarGroups", () => {
     expect(hrefs).not.toContain("/app/ai/memory");
     expect(hrefs).toContain("/app/ai/knowledge/sources");
     expect(hrefs).toContain("/app/ai/agents");
+    expect(hrefs).toContain("/app/flows");
   });
 
   it("Etapas do funil é CRM, não Configurações — o achado que originou esta mudança", () => {

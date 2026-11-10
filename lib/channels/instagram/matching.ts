@@ -89,12 +89,30 @@ export function findMatchingRule(
 
       const ruleType =
         r.type || (r as unknown as { trigger_type?: string }).trigger_type || "comment_keyword";
-      if (ruleType !== type) return false;
+      const isStoryRule =
+        ruleType === "story_mention" ||
+        r.media_caption_preview?.startsWith("[STORY]") ||
+        r.media_id?.includes("story");
+
+      // Se o evento é de Story (menção ou resposta), aceita regras de story ou regras que tenham selecionado o story
+      if (type === "story_mention") {
+        if (!isStoryRule && ruleType !== "comment_keyword" && ruleType !== "dm_keyword") {
+          return false;
+        }
+      } else if (type === "dm_keyword") {
+        // Se o evento é DM e a regra é de DM ou story, ou regra de palavra-chave sem mídia exclusiva de feed
+        if (ruleType !== "dm_keyword" && !isStoryRule && ruleType !== "comment_keyword") {
+          return false;
+        }
+      } else if (ruleType !== type && !isStoryRule) {
+        return false;
+      }
 
       // Se a regra exige um Post/Reels/Story específico, valida o media_id
       const ruleMediaId = r.media_id?.trim();
       if (ruleMediaId && ruleMediaId !== "all") {
-        if (!targetMediaId || ruleMediaId !== targetMediaId) {
+        // Se o evento trouxe o mediaId, exige que coincida. Se for story_mention e o evento não trouxe o ID, permite casar se a regra for de story.
+        if (targetMediaId && ruleMediaId !== targetMediaId) {
           return false;
         }
       }

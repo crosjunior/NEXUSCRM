@@ -19106,6 +19106,12 @@ export const DICIONARIO: Traducoes = {
   "Desconectando...": { es: "Desconectando..." },
   "Desconectar Outlook": { es: "Desconectar Outlook" },
   "Conectar Outlook & Teams": { es: "Conectar Outlook & Teams" },
+  "Fluxos": { es: "Flujos" },
+  "Fluxos de Atendimento": { es: "Flujos de Atención" },
+  "Fluxos e Automações de Atendimento": { es: "Flujos y Automatizaciones de Atención" },
+  "Gerenciar Fluxos": { es: "Gestionar Flujos" },
+  "Fluxos visuais e automações de mensagens para Instagram e WhatsApp.": { es: "Flujos visuales y automatizaciones de mensajes para Instagram y WhatsApp." },
+  "Crie e gerencie fluxos visuais (estilo ManyChat e NexusReply) e regras de resposta automática para comentários, menções em stories e mensagens diretas no Instagram e WhatsApp.": { es: "Crea y gestiona flujos visuales (estilo ManyChat y NexusReply) y reglas de respuesta automática para comentarios, menciones en stories y mensajes directos en Instagram y WhatsApp." },
 };
 
 /**

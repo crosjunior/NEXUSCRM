@@ -769,6 +769,16 @@ export const NAV_CATALOG = [
     healthDot: true,
   },
   {
+    href: "/app/flows",
+    label: "Fluxos",
+    description:
+      "Fluxos visuais e automações de mensagens para Instagram e WhatsApp.",
+    icon: "FlowArrow",
+    group: "canais",
+    minRole: "manager",
+    sidebar: true,
+  },
+  {
     // Não tinha link nenhum no app inteiro: só se chegava digitando a URL.
     href: "/app/integrations/nuvemshop",
     label: "Nuvemshop",

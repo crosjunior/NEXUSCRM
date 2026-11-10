@@ -302,14 +302,26 @@ export async function processInstagramWebhookEvent(
     .eq("provider", SOCIAL_PROVIDER)
     .is("archived_at", null);
 
-  const session = (candidates ?? []).find((row) => {
-    const meta = (row.metadata ?? {}) as Record<string, unknown>;
-    return row.zernio_account_id === event.igUserId || String(meta.ig_user_id || "") === event.igUserId;
-  });
+  const recipientId = (event as { recipientId?: string }).recipientId;
+  const session =
+    (candidates ?? []).find((row) => {
+      const meta = (row.metadata ?? {}) as Record<string, unknown>;
+      const igId = String(meta.ig_user_id || row.zernio_account_id || "");
+      const pageId = String(meta.page_id || meta.facebook_page_id || "");
+      return (
+        igId === event.igUserId ||
+        (recipientId && igId === recipientId) ||
+        (pageId && (pageId === event.igUserId || (recipientId && pageId === recipientId))) ||
+        row.zernio_account_id === event.igUserId ||
+        (recipientId && row.zernio_account_id === recipientId)
+      );
+    }) ?? (candidates?.length === 1 ? candidates[0] : null);
 
   if (error || !session) {
     logger.info("[instagram.webhook] Nenhuma sessão ativa encontrada para conta", {
       igUserId: event.igUserId,
+      recipientId,
+      candidatos: (candidates ?? []).map((c) => c.zernio_account_id),
     });
     return { status: "ignored", reason: "conta_nao_encontrada" };
   }
