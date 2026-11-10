@@ -6,9 +6,27 @@
  *   npx tsx scripts/criar-agente-atendimento-whatsapp.ts [org_id]
  */
 
-import { createAdminClient } from "@/lib/supabase/admin";
-import { publishAgentVersion } from "@/lib/ai/agents/publish";
-import { VALID_TOOL_IDS } from "@/lib/mcp/tools/catalog";
+import * as fs from "node:fs";
+import * as path from "node:path";
+
+// Carrega .env / .env.local automaticamente em qualquer versão do Node (inclusive Node 18)
+for (const file of [".env", ".env.local"]) {
+  const p = path.join(process.cwd(), file);
+  if (!fs.existsSync(p)) continue;
+  for (const line of fs.readFileSync(p, "utf8").split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const m = trimmed.match(/^([A-Za-z0-9_]+)=(.*)$/);
+    if (m && !process.env[m[1]!]) {
+      const val = m[2]!.replace(/^["'](.*)["']$/, "$1");
+      process.env[m[1]!] = val;
+    }
+  }
+}
+
+const { createAdminClient } = await import("@/lib/supabase/admin");
+const { publishAgentVersion } = await import("@/lib/ai/agents/publish");
+const { VALID_TOOL_IDS } = await import("@/lib/mcp/tools/catalog");
 
 const PROMPT_ATENDIMENTO_WHATSAPP = `# Quem você é
 Você é o assistente virtual oficial de atendimento da empresa.
