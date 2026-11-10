@@ -5,6 +5,7 @@ import { trocarCodigoPorTokensOutlook } from "@/lib/agenda/outlook/oauth";
 import { env } from "@/lib/env";
 import { audit } from "@/lib/audit";
 import { encryptKey } from "@/lib/crypto/aes_gcm";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
     );
 
     if (upsertErr) {
-      console.error("[outlook-callback] erro ao gravar connection:", upsertErr.message);
+      logger.error("[outlook-callback] erro ao gravar connection:", { error: upsertErr.message });
       return NextResponse.redirect(`${appUrl}/app/agenda?erro=gravacao_falhou`);
     }
 
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.redirect(`${appUrl}/app/agenda?sucesso=outlook_conectado`);
   } catch (err) {
-    console.error("[outlook-callback] erro na troca de tokens:", err);
+    logger.error("[outlook-callback] erro na troca de tokens:", { error: err instanceof Error ? err.message : String(err) });
     return NextResponse.redirect(`${appUrl}/app/agenda?erro=outlook_falha_geral`);
   }
 }

@@ -21,9 +21,9 @@ import {
   ArrowRight,
   Filter,
   SlidersHorizontal,
-  Instagram,
   RefreshCw,
 } from "lucide-react";
+import { InstagramLogo } from "@/lib/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -455,7 +455,7 @@ export function InstagramFlowsManager() {
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between text-muted-foreground">
             <span className="text-xs font-medium">{t("Canal Conectado")}</span>
-            <Instagram className="h-4 w-4 text-pink-500" />
+            <InstagramLogo className="h-4 w-4 text-pink-500" />
           </div>
           <div className="mt-2 text-sm font-semibold truncate">
             {state?.account?.username ? `@${state.account.username}` : t("Instagram Direct")}

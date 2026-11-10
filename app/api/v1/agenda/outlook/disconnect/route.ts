@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth/require-role";
+import { requireSupportWrite } from "@/lib/impersonate/support";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ok, fail } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
 
 export async function POST() {
   const requestId = randomUUID();
+  const supportDenied = await requireSupportWrite();
+  if (supportDenied) return supportDenied;
+
   const authz = await requireRole("agent", { requestId });
   if (!authz.ok) return authz.response;
 

@@ -2,8 +2,6 @@
  * Configurações e constantes da integração com Microsoft Outlook e Teams via Microsoft Graph API
  */
 
-import { env } from "@/lib/env";
-
 export const PROVEDOR_OUTLOOK = "outlook" as const;
 export const CAMINHO_DO_CALLBACK_OUTLOOK = "/api/v1/agenda/outlook/callback";
 
