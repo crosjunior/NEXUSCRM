@@ -35,6 +35,7 @@ import {
   type ProvedorComChave,
 } from "@/lib/ai/pontos/provedores";
 import { descreverErroDeValidacao } from "@/lib/ai/credenciais/erro-de-validacao";
+import { GuiaCriacaoApiKey } from "@/components/ai/GuiaCriacaoApiKey";
 import { useT } from "@/hooks/i18n/useT";
 
 /**
@@ -258,6 +259,7 @@ export function AddCredentialDialog({ open, onOpenChange, providerInicial = "ant
             {errors.provider && (
               <p className="text-xs text-destructive">{errors.provider}</p>
             )}
+            <GuiaCriacaoApiKey providerOrModel={provider} className="mt-2" />
           </div>
 
           {provider === "custom" && (

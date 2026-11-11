@@ -334,10 +334,22 @@ export async function resolverChaveDeEmbedding(
     }
   }
 
-  // 7 · Credencial Google da organização — só quando não há nenhuma via OpenAI.
+  // 7 · Credencial Google da organização ou da instalação (GEMINI_API_KEY) — só quando não há nenhuma via OpenAI.
   if (familia !== "openai") {
     const googleDaOrg = await credencialDaOrganizacao(organizationId, "google");
     if (googleDaOrg) return daOrganizacao(googleDaOrg);
+
+    if (env.GEMINI_API_KEY) {
+      return {
+        apiKey: env.GEMINI_API_KEY,
+        baseUrl: null,
+        provedor: "google",
+        viaGateway: false,
+        origem: "chave_da_instalacao",
+        rotulo: null,
+        avisos,
+      };
+    }
   }
 
   return null;

@@ -431,6 +431,7 @@ export async function indexarFonte(
         pedacos = await pedacosDeFaq(fonte);
         break;
       case "documento":
+      case "link":
         pedacos = await pedacosDeDocumento(fonte);
         break;
       case "catalogo":

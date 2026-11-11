@@ -32,6 +32,7 @@ import { listarLinks, metricasLinks } from "@/lib/plataformas-de-anuncio/rastrei
  * de billing e API tokens na mesma prancheta. Mesmo gate de `settings/marca`.
  */
 import { ScriptDoSite } from "./_scriptDoSite";
+import { WebChatWidgetConfig } from "@/components/chat/WebChatWidgetConfig";
 import { redirect } from "next/navigation";
 
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
@@ -529,12 +530,19 @@ export default async function ConversoesPage({
         formato nem os limites.
       */}
           {slug ? (
-            <ScriptDoSite
-              slug={slug}
-              google={capturaGoogle}
-              meta={estadoDaCaptura}
-              idioma={idioma}
-            />
+            <>
+              <WebChatWidgetConfig
+                orgSlug={slug}
+                orgName={org.name}
+                defaultPhone={numerosConectados[0] ?? ""}
+              />
+              <ScriptDoSite
+                slug={slug}
+                google={capturaGoogle}
+                meta={estadoDaCaptura}
+                idioma={idioma}
+              />
+            </>
           ) : null}
           <section className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold">{t("Quem chegou pelo site")}</h2>

@@ -28,9 +28,12 @@ function getRedis(): Redis | null {
   const config = validarConfigRedisRest(url, token);
   if (!config.ok) {
     if (!_fallbackWarned) {
-      logger.warn(
-        `[ai-dispatcher.rate-limit] Redis ${config.reason} — using in-memory fallback (not safe for multi-instance)`,
-      );
+      // Se REDIS_URL estiver definida no .env (fallback ou instâncias locais), silencia o aviso ruidoso
+      if (!env.REDIS_URL && !process.env.REDIS_URL) {
+        logger.warn(
+          `[ai-dispatcher.rate-limit] Redis ${config.reason} — using in-memory fallback (not safe for multi-instance)`,
+        );
+      }
       _fallbackWarned = true;
     }
     return null;

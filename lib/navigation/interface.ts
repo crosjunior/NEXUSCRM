@@ -79,11 +79,22 @@ const SIMPLIFICADA: readonly NavDestinationId[] = [
  * duas entra em `ESSENCIAIS_DE_ADMIN`: sendo pessoais, ficam visíveis para todo
  * vínculo em qualquer preset, como Perfil e Segurança.
  */
+/** Rotas temporariamente ocultas e desativadas no MVP */
+export const ROTAS_OCULTAS_MVP: readonly string[] = [
+  "/app/campaigns",
+  "/app/comandas",
+  "/app/ai/providers",
+  "/app/ai/tools",
+  "/app/calls",
+  "/app/settings/api-tokens",
+  "/app/extensions",
+  "/app/settings/aplicativo",
+];
+
 export const PORTAS_ESSENCIAIS = [
   "/app/settings/profile",
   "/app/settings/security",
   "/app/settings/notifications",
-  "/app/settings/aplicativo",
   "/app/team",
   "/app/settings/tenant",
 ] as const;
@@ -123,6 +134,7 @@ export function permitidos(
 ): NavMetadata[] {
   return (NAV_CATALOG as readonly NavMetadata[]).filter(
     (d) =>
+      !ROTAS_OCULTAS_MVP.includes(d.href) &&
       canSee(d, platform, role) &&
       (!modulos || !d.modulo || modulos.includes(d.modulo)) &&
       (!capacidades || !d.capacidade || capacidades.includes(d.capacidade)),

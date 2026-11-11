@@ -293,9 +293,12 @@ const schema = z.object({
   // Upstash Redis
   UPSTASH_REDIS_REST_URL: required("UPSTASH_REDIS_REST_URL"),
   UPSTASH_REDIS_REST_TOKEN: required("UPSTASH_REDIS_REST_TOKEN"),
+  REDIS_URL: z.string().optional().default(""),
 
   // AI providers — env-gated. Worker no-ops with skip="ai_gateway_key_missing"
   // when AI_GATEWAY_API_KEY is absent, so production boot must not be fatal.
+  AI_PROVIDER: z.string().optional().default("google"),
+  AI_SECONDARY_PROVIDER: z.string().optional().default("openrouter"),
   AI_GATEWAY_API_KEY: z.string().optional().default(""),
   AI_GATEWAY_BASE_URL: z.string().optional().default(""),
   // OpenRouter: alternativa ao gateway da Vercel, compatível com a API da
@@ -303,6 +306,8 @@ const schema = z.object({
   // por lá. Ver resolveLanguageModel() em lib/ai/gateway.ts.
   OPENROUTER_API_KEY: z.string().optional().default(""),
   OPENROUTER_BASE_URL: z.string().optional().default(""),
+  // Google Gemini (IA Principal)
+  GEMINI_API_KEY: z.string().optional().default(""),
   // Atribuição OPCIONAL da OpenRouter (`HTTP-Referer` / `X-Title`): identifica a
   // instalação no painel e no ranking público DELES. A doc da OpenRouter chama
   // os dois de opcionais e a chamada funciona sem — por isso default vazio e
@@ -732,11 +737,12 @@ if (
   !env.AI_GATEWAY_API_KEY &&
   !env.ANTHROPIC_API_KEY &&
   !env.OPENROUTER_API_KEY &&
-  !env.OPENAI_API_KEY
+  !env.OPENAI_API_KEY &&
+  !env.GEMINI_API_KEY
 ) {
   console.warn(
     "[env] Nenhuma chave de IA configurada no ambiente " +
-      "(AI_GATEWAY_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY ou OPENAI_API_KEY). " +
+      "(GEMINI_API_KEY, OPENROUTER_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY ou AI_GATEWAY_API_KEY). " +
       "Isto não prova que o agente está sem credencial: cada organização pode ter uma chave " +
       "cadastrada em IA › Credenciais. A falta real só é conhecida quando a resolução completa " +
       "do turno não encontra chave em nenhum degrau.",
@@ -756,7 +762,7 @@ if (
 // uma chave que ela já tem — ou, pior, desistir do recurso. Então o aviso passou
 // a dizer só o que ESTE processo sabe: o que a variável é, e o que fazer se não
 // houver chave em lugar nenhum.
-if (!env.OPENAI_API_KEY) {
+if (!env.OPENAI_API_KEY && !env.GEMINI_API_KEY && !env.TRANSCRIPTION_API_KEY) {
   console.warn(
     "[env] OPENAI_API_KEY ausente — ela é o ÚLTIMO degrau da escada de chave da OpenAI " +
       "(preparo de material do acervo e transcrição de áudio). Se alguma organização já " +

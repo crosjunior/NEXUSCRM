@@ -225,6 +225,8 @@ export const PUBLIC_PATHS: RegExp[] = [
   // dois nomes de propósito: `/^\/legal/` deixaria qualquer sub-path futuro
   // nascer público de carona.
   /^\/legal\/(terms|privacy)$/,
+  // Endpoint público do Web Chat Widget para visitantes em sites externos
+  /^\/api\/v1\/public\/widget\/chat$/,
 ];
 
 export function isPublicPath(pathname: string): boolean {

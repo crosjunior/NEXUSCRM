@@ -37,6 +37,7 @@ import Link from "next/link";
 
 import { TETO_TOOLS_POR_AGENTE } from "@/lib/mcp/tools/selecao-por-pacote";
 import { PROVEDOR_POR_ASSINATURA, PROVEDORES } from "@/lib/ai/pontos/provedores";
+import { GuiaCriacaoApiKey } from "@/components/ai/GuiaCriacaoApiKey";
 
 import { ModelPicker, useModelMeta } from "./ModelPicker";
 import { CHAVE_DA_INSTALACAO, CredentialPicker, STATUS_LABEL, findCredential } from "./CredentialPicker";
@@ -956,6 +957,8 @@ export function AgentForm(props: Props) {
                 {t(". Publish bloqueado até validar.")}
               </p>
             ) : null}
+
+            <GuiaCriacaoApiKey providerOrModel={form.model || form.provider} className="mt-2" />
           </Card>
 
           {/* WhatsApp session */}

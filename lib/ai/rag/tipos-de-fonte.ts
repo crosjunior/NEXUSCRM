@@ -35,6 +35,8 @@ export type ComoSePreenche =
    * pessoa que cola a política de troca não quer saber a diferença.
    */
   | "arquivo_ou_texto"
+  /** A pessoa informa uma URL / Link da web para extração automática de conteúdo. */
+  | "link_web"
   /** Uma rotina do sistema alimenta sozinha; não há o que colar. */
   | "automatico";
 
@@ -67,6 +69,13 @@ export const TIPOS_DE_FONTE = [
     oQueE:
       "Um texto do seu negócio — política de troca, tabela de preços, manual, contrato. Envie o arquivo (PDF, Markdown, CSV ou texto) ou cole o conteúdo.",
     comoSePreenche: "arquivo_ou_texto",
+  },
+  {
+    id: "link",
+    rotulo: "Link da Web / URL",
+    oQueE:
+      "Uma página da web, manual online ou artigo de suporte. O sistema extrai e mantém o conteúdo atualizado.",
+    comoSePreenche: "link_web",
   },
   {
     id: "conversas",
@@ -118,6 +127,9 @@ export function canonizarTipoDeFonte(bruto: string): TipoDeFonteId | null {
     case "documento":
     case "policy":
       return "documento";
+    case "link":
+    case "url":
+      return "link";
     case "conversas":
     case "conversations":
     case "conversation":
@@ -139,12 +151,17 @@ export function rotuloDoTipo(id: string): string {
 /** O tipo aceita conteúdo digitado/colado pela pessoa? */
 export function aceitaTextoColado(id: string): boolean {
   const c = TIPO_DE_FONTE_POR_ID.get(id)?.comoSePreenche;
-  return c === "texto_colado" || c === "arquivo_ou_texto";
+  return c === "texto_colado" || c === "arquivo_ou_texto" || c === "link_web";
 }
 
 /** O conteúdo colado é uma lista de pergunta/resposta (e não texto corrido)? */
 export function ePerguntaEResposta(id: string): boolean {
-  return TIPO_DE_FONTE_POR_ID.get(id)?.comoSePreenche === "texto_colado";
+  return id === "faq";
+}
+
+/** O tipo é um link da web que requer extração remota? */
+export function eLinkWeb(id: string): boolean {
+  return id === "link" || TIPO_DE_FONTE_POR_ID.get(id)?.comoSePreenche === "link_web";
 }
 
 /** O tipo aceita arquivo enviado pela pessoa? */

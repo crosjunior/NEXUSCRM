@@ -76,6 +76,7 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
   const [tipo, setTipo] = useState<TipoDeFonteId>("faq");
   const [nome, setNome] = useState("");
   const [conteudo, setConteudo] = useState("");
+  const [url, setUrl] = useState("");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [enviando, setEnviando] = useState(false);
   const inputArquivo = useRef<HTMLInputElement>(null);
@@ -86,24 +87,40 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
   function limpar(): void {
     setNome("");
     setConteudo("");
+    setUrl("");
     setArquivo(null);
     if (inputArquivo.current) inputArquivo.current.value = "";
   }
 
   async function criar(): Promise<void> {
     const nomeLimpo = nome.trim();
-    if (nomeLimpo.length < 2) {
-      toast.error(t("Dê um nome ao material — é assim que você o encontra depois."));
-      return;
-    }
-    if (!arquivo && conteudo.trim().length === 0) {
-      toast.error(t("Envie um arquivo ou cole o conteúdo."));
-      return;
+    const urlLimpa = url.trim();
+
+    if (tipo === "link") {
+      if (!urlLimpa.startsWith("http://") && !urlLimpa.startsWith("https://")) {
+        toast.error(t("Informe uma URL válida iniciando com https:// ou http://"));
+        return;
+      }
+    } else {
+      if (nomeLimpo.length < 2) {
+        toast.error(t("Dê um nome ao material — é assim que você o encontra depois."));
+        return;
+      }
+      if (!arquivo && conteudo.trim().length === 0) {
+        toast.error(t("Envie um arquivo ou cole o conteúdo."));
+        return;
+      }
     }
 
     setEnviando(true);
     try {
-      if (arquivo) {
+      if (tipo === "link") {
+        await apiClient.post("/api/v1/ai/knowledge/sources", {
+          source_type: "link",
+          name: nomeLimpo.length >= 2 ? nomeLimpo : urlLimpa,
+          url: urlLimpa,
+        });
+      } else if (arquivo) {
         const form = new FormData();
         form.append("file", arquivo);
         form.append("name", nomeLimpo);
@@ -188,16 +205,43 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="material-nome">{t("Nome do material")}</Label>
+            <Label htmlFor="material-nome">
+              {tipo === "link" ? t("Nome ou título (opcional)") : t("Nome do material")}
+            </Label>
             <Input
               id="material-nome"
               data-testid="material-nome"
-              placeholder={tipo === "faq" ? t("Perguntas frequentes da loja") : t("Política de troca")}
+              placeholder={
+                tipo === "faq"
+                  ? t("Perguntas frequentes da loja")
+                  : tipo === "link"
+                    ? t("Manual online / Artigo")
+                    : t("Política de troca")
+              }
               value={nome}
               onChange={(e) => setNome(e.target.value)}
               disabled={enviando || porRotina}
             />
           </div>
+
+          {tipo === "link" ? (
+            <div className="space-y-2">
+              <Label htmlFor="material-url">{t("Endereço da página (URL)")}</Label>
+              <Input
+                id="material-url"
+                data-testid="material-url"
+                placeholder="https://exemplo.com.br/artigo-ou-manual"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                disabled={enviando}
+              />
+              <p className="text-xs text-text-muted">
+                {t(
+                  "O sistema acessa o link com segurança, extrai os textos, títulos e parágrafos estruturados e adiciona ao acervo do assistente.",
+                )}
+              </p>
+            </div>
+          ) : null}
 
           {aceitaArquivo(tipo) ? (
             <div className="space-y-2">
@@ -219,7 +263,7 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
             </div>
           ) : null}
 
-          {!porRotina && !arquivo ? (
+          {!porRotina && !arquivo && tipo !== "link" ? (
             <div className="space-y-2">
               <Label htmlFor="material-conteudo">
                 {aceitaArquivo(tipo) ? t("…ou cole o texto aqui") : t("Conteúdo")}

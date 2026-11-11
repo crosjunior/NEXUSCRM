@@ -12,6 +12,7 @@
  */
 
 import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import type { LanguageModel } from "ai";
 
@@ -70,11 +71,23 @@ export function resolveLanguageModel(model: ModelId): LanguageModel | null {
 
   if (gatewayConfig()) return id as LanguageModel;
 
+  // 1. Google Gemini (IA Principal)
+  if ((id.startsWith("google/") || id.startsWith("gemini")) && env.GEMINI_API_KEY) {
+    const modelId = id.startsWith("google/") ? id.slice("google/".length) : id;
+    return createGoogleGenerativeAI({ apiKey: env.GEMINI_API_KEY })(modelId);
+  }
+
+  // 2. OpenRouter (Llama ou outros modelos via OpenRouter como IA Secundária)
   if (env.OPENROUTER_API_KEY) {
     return createOpenAI({
       apiKey: env.OPENROUTER_API_KEY,
       baseURL: env.OPENROUTER_BASE_URL || OPENROUTER_BASE_URL,
     }).chat(id); // chat/completions, como o registry do worker (providers.ts)
+  }
+
+  // 3. Fallback Gemini se o id contiver gemini/flash/pro e GEMINI_API_KEY estiver configurada
+  if (env.GEMINI_API_KEY && (id.includes("flash") || id.includes("gemini") || id.includes("pro"))) {
+    return createGoogleGenerativeAI({ apiKey: env.GEMINI_API_KEY })(id);
   }
 
   if (id.startsWith("anthropic/") && env.ANTHROPIC_API_KEY) {
@@ -92,9 +105,9 @@ export function resolveLanguageModel(model: ModelId): LanguageModel | null {
 
 export function isEmbeddingProviderConfigured(): boolean {
   // Embeddings go through the gateway when `AI_GATEWAY_API_KEY` is set;
-  // otherwise the worker uses an OpenAI or OpenRouter key from the installation.
+  // otherwise the worker uses a Gemini, OpenAI or OpenRouter key from the installation.
   // Tenant credentials are resolved by temChaveDeEmbedding(organizationId).
-  return Boolean(env.AI_GATEWAY_API_KEY || env.OPENAI_API_KEY || env.OPENROUTER_API_KEY);
+  return Boolean(env.AI_GATEWAY_API_KEY || env.OPENAI_API_KEY || env.OPENROUTER_API_KEY || env.GEMINI_API_KEY);
 }
 
 /**

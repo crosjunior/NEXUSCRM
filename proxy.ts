@@ -11,6 +11,7 @@ import {
   verifyImpersonateCookieEdge,
   IMPERSONATE_COOKIE_NAME_EDGE,
 } from "@/lib/impersonate/cookie-edge";
+import { ROTAS_OCULTAS_MVP } from "@/lib/navigation/interface";
 
 const COOKIE_NAME = "sb-deskcomm-auth";
 
@@ -155,6 +156,11 @@ export async function proxy(request: NextRequest) {
         );
         response.cookies.delete(IMPERSONATE_COOKIE_NAME_EDGE);
       }
+    }
+
+    // Rotas temporariamente ocultas/desativadas no MVP — redireciona para o Inbox
+    if (ROTAS_OCULTAS_MVP.some((prefixo) => pathname === prefixo || pathname.startsWith(`${prefixo}/`))) {
+      return NextResponse.redirect(new URL("/app/inbox", request.url));
     }
   }
 

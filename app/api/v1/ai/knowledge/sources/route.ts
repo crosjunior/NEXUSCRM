@@ -31,6 +31,7 @@ import {
 } from "@/lib/ai/rag/tipos-de-fonte";
 import { BUCKET_DE_CONHECIMENTO } from "@/lib/ai/rag/ingest/documento";
 import { traduzir } from "@/lib/i18n/dicionario";
+import { extractUrlContent, UrlExtractError } from "@/lib/ai/rag/extractors/url";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,7 @@ const createSourceSchema = z.object({
   name: z.string().trim().min(2).max(120),
   items: z.array(faqItemSchema).optional(),
   markdown_blob: z.string().optional(),
+  url: z.string().url().optional(),
   source_metadata: z.record(z.string(), z.unknown()).optional().default({}),
 });
 
@@ -212,25 +214,63 @@ export async function POST(req: NextRequest): Promise<Response> {
       400,
       { requestId },
     );
+  } else if (tipo === "link" && !input.url && !input.markdown_blob?.trim()) {
+    return fail(
+      "invalid_request",
+      t("Informe o Link / URL da página para extração."),
+      400,
+      { requestId },
+    );
   }
 
   const admin = createAdminClient();
 
-  // TEXTO COLADO DE DOCUMENTO VIRA ARQUIVO.
-  //
-  // Um documento não é uma lista de pergunta/resposta: é texto corrido, e não
-  // havia onde guardá-lo — o indexador só sabia ler `ai_faq_items`, e era por
-  // isso que colar uma política produzia uma fonte que nunca indexava nada.
+  // TEXTO COLADO DE DOCUMENTO OU CONTEÚDO EXTRAÍDO DE URL VIRA ARQUIVO.
   //
   // Em vez de uma tabela nova para "texto que não é P/R", o texto é guardado
   // como `.md` no mesmo bucket dos arquivos e segue exatamente a mesma rota de
   // extração. Um destino, um caminho, um lugar para consertar.
   let metadata: Record<string, unknown> = { ...(input.source_metadata ?? {}) };
-  if (tipo === "documento" && input.markdown_blob) {
+  let textoParaGuardar: string | null = null;
+  let nomeDoMaterial = input.name;
+
+  if (tipo === "link") {
+    const rawUrl = input.url || (input.markdown_blob?.trim().startsWith("http") ? input.markdown_blob.trim() : null);
+    if (!rawUrl) {
+      return fail("invalid_request", t("Informe uma URL válida (iniciando com http:// ou https://)."), 400, {
+        requestId,
+      });
+    }
+
+    try {
+      const extraido = await extractUrlContent(rawUrl);
+      textoParaGuardar = extraido.markdown;
+      if (!nomeDoMaterial || nomeDoMaterial.trim().length === 0) {
+        nomeDoMaterial = extraido.titulo.slice(0, 120);
+      }
+      metadata = {
+        ...metadata,
+        url: extraido.url,
+        titulo_original: extraido.titulo,
+        origem: "link_web",
+      };
+    } catch (err: unknown) {
+      if (err instanceof UrlExtractError) {
+        return fail("unprocessable_entity", t(err.message), 422, { requestId });
+      }
+      console.error("[ai-knowledge-sources] erro ao extrair url:", err);
+      return fail("internal_error", t("Falha ao extrair conteúdo da URL."), 500, { requestId });
+    }
+  } else if (tipo === "documento" && input.markdown_blob) {
+    textoParaGuardar = input.markdown_blob;
+    metadata = { ...metadata, origem: "texto_colado" };
+  }
+
+  if (textoParaGuardar) {
     const blobPath = `${activeOrg.orgId}/${randomUUID()}.md`;
     const { error: upErr } = await admin.storage
       .from(BUCKET_DE_CONHECIMENTO)
-      .upload(blobPath, Buffer.from(input.markdown_blob, "utf8"), {
+      .upload(blobPath, Buffer.from(textoParaGuardar, "utf8"), {
         contentType: "text/markdown",
         upsert: false,
       });
@@ -238,7 +278,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       console.error("[ai-knowledge-sources] guardar o texto falhou:", upErr.message);
       return fail("internal_error", t("Erro ao guardar o conteúdo do material."), 500, { requestId });
     }
-    metadata = { ...metadata, blob_path: blobPath, ext: "md", origem: "texto_colado" };
+    metadata = { ...metadata, blob_path: blobPath, ext: "md" };
   }
 
   const { data: ks, error: ksErr } = await admin
@@ -247,7 +287,7 @@ export async function POST(req: NextRequest): Promise<Response> {
       organization_id: activeOrg.orgId,
       agent_id: input.agent_id ?? null,
       source_type: tipo,
-      name: input.name,
+      name: nomeDoMaterial,
       status: "ready",
       is_active: true,
       source_metadata: metadata,
