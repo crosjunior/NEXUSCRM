@@ -519,7 +519,7 @@ export function InstagramFlowsManager() {
               </h3>
               <p className="text-xs text-muted-foreground">
                 {ruleForm.mode === "visual"
-                  ? t("Construtor Visual de Fluxo no estilo ManyChat / NexusReply com nós interativos.")
+                  ? t("Construtor Visual de Fluxo com nós interativos.")
                   : t("Regra direta para responder comentários e enviar mensagem privada.")}
               </p>
             </div>
@@ -856,7 +856,7 @@ export function InstagramFlowsManager() {
               <Workflow className="h-10 w-10 text-muted-foreground/50 mb-3" />
               <h3 className="text-sm font-semibold">{t("Nenhuma automação ou fluxo criado")}</h3>
               <p className="mt-1 text-xs text-muted-foreground max-w-md">
-                {t("Crie sua primeira regra de palavra-chave ou fluxo visual ManyChat / NexusReply para responder automaticamente a comentários, menções nos stories e mensagens diretas.")}
+                {t("Crie sua primeira regra de palavra-chave ou fluxo visual para responder automaticamente a comentários, menções nos stories e mensagens diretas.")}
               </p>
               <div className="mt-4 flex items-center gap-2">
                 <Button size="sm" variant="outline" onClick={() => openNewRuleForm("basic")}>

@@ -18735,14 +18735,14 @@ export const DICIONARIO: Traducoes = {
   "Nenhum (Somente Atendimento Humano ou Automações)": { es: "Ninguno (Solo Atención Humana o Automatizaciones)" },
   "Vincular Agente": { es: "Vincular Agente" },
   "Automações de Comentários, Stories e DMs": { es: "Automatizaciones de Comentarios, Historias y DMs" },
-  "Crie regras no formato Básico ou no Construtor Visual (estilo ManyChat / NexusReply), escolha Posts/Reels/Stories específicos e acompanhe os indicadores de cada regra.": { es: "Crea reglas en formato Básico o en el Constructor Visual (estilo ManyChat / NexusReply), elige Posts/Reels/Historias específicos y sigue los indicadores de cada regla." },
+  "Crie regras no formato Básico ou no Construtor Visual, escolha Posts/Reels/Stories específicos e acompanhe os indicadores de cada regra.": { es: "Crea reglas en formato Básico o en el Constructor Visual, elige Posts/Reels/Historias específicos y sigue los indicadores de cada regla." },
   "+ Regra Básica": { es: "+ Regla Básica" },
   "+ Regra Visual (Fluxo)": { es: "+ Regla Visual (Flujo)" },
   "Editar Regra de Automação": { es: "Editar Regla de Automatización" },
   "Criar Nova Regra de Automação": { es: "Crear Nueva Regla de Automatización" },
   "Escolha abaixo entre o formulário rápido (Modo Básico) ou o construtor de blocos com botões, condições e ações (Modo Visual).": { es: "Elige abajo entre el formulario rápido (Modo Básico) o el constructor de bloques con botones, condiciones y acciones (Modo Visual)." },
   "Modo Básico": { es: "Modo Básico" },
-  "Modo Visual (ManyChat / NexusReply)": { es: "Modo Visual (ManyChat / NexusReply)" },
+  "Modo Visual": { es: "Modo Visual" },
   "Nome de identificação da regra": { es: "Nombre de identificación de la regla" },
   "Vigência da Regra": { es: "Vigencia de la Regla" },
   "Regra Permanente": { es: "Regla Permanente" },
@@ -19111,7 +19111,7 @@ export const DICIONARIO: Traducoes = {
   "Fluxos e Automações de Atendimento": { es: "Flujos y Automatizaciones de Atención" },
   "Gerenciar Fluxos": { es: "Gestionar Flujos" },
   "Fluxos visuais e automações de mensagens para Instagram e WhatsApp.": { es: "Flujos visuales y automatizaciones de mensajes para Instagram y WhatsApp." },
-  "Crie e gerencie fluxos visuais (estilo ManyChat e NexusReply) e regras de resposta automática para comentários, menções em stories e mensagens diretas no Instagram e WhatsApp.": { es: "Crea y gestiona flujos visuales (estilo ManyChat y NexusReply) y reglas de respuesta automática para comentarios, menciones en stories y mensajes directos en Instagram y WhatsApp." },
+  "Crie e gerencie fluxos visuais e regras de resposta automática para comentários, menções em stories e mensagens diretas no Instagram e WhatsApp.": { es: "Crea y gestiona flujos visuales y reglas de respuesta automática para comentarios, menciones en stories y mensajes directos en Instagram y WhatsApp." },
 };
 
 /**

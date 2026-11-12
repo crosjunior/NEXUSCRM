@@ -258,7 +258,7 @@ export function InstagramDirectCard() {
             </div>
             <p className="text-xs text-muted-foreground max-w-xl">
               {t(
-                "A criação e edição de fluxos visuais (estilo ManyChat e NexusReply), respostas a posts/reels, stories e acompanhamento de métricas agora possuem uma página exclusiva.",
+                "A criação e edição de fluxos visuais, respostas a posts/reels, stories e acompanhamento de métricas agora possuem uma página exclusiva.",
               )}
             </p>
           </div>

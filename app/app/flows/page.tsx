@@ -27,7 +27,7 @@ export default async function FlowsPage() {
         </h1>
         <p className="text-sm text-muted-foreground">
           {traduzir(
-            "Crie e gerencie fluxos visuais (estilo ManyChat e NexusReply) e regras de resposta automática para comentários, menções em stories e mensagens diretas no Instagram e WhatsApp.",
+            "Crie e gerencie fluxos visuais e regras de resposta automática para comentários, menções em stories e mensagens diretas no Instagram e WhatsApp.",
             idioma,
           )}
         </p>
