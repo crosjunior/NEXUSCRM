@@ -147,7 +147,7 @@ export default async function ConversoesPage({
     // O `slug` é o `[org]` da rota pública, e não está no `ActiveOrg`.
     admin
       .from("organizations")
-      .select("slug, settings, meta_lead_birth_enabled_at")
+      .select("name, slug, settings, meta_lead_birth_enabled_at")
       .eq("id", activeOrg.orgId)
       .maybeSingle(),
     lerEstadoDaCaptura(admin, "google_ads_landing_pages", activeOrg.orgId),
@@ -173,11 +173,13 @@ export default async function ConversoesPage({
     })),
   ];
   const linhaDaOrganizacao = organizacao.data as unknown as {
+    name?: string | null;
     slug: string | null;
     settings?: unknown;
     meta_lead_birth_enabled_at?: unknown;
   } | null;
   const slug = linhaDaOrganizacao?.slug ?? null;
+  const orgName = linhaDaOrganizacao?.name ?? "Nexus CRM";
   // Página / WABA gravadas pela tela (#2098) — a MESMA leitura que a credencial
   // faz no caminho do envio, para a tela e o envio nunca divergirem.
   const identidadeMeta = identidadeDaMeta(linhaDaOrganizacao?.settings);
@@ -533,7 +535,7 @@ export default async function ConversoesPage({
             <>
               <WebChatWidgetConfig
                 orgSlug={slug}
-                orgName={org.name}
+                orgName={orgName}
                 defaultPhone={numerosConectados[0] ?? ""}
               />
               <ScriptDoSite
