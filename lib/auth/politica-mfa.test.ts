@@ -35,9 +35,7 @@ describe("exigeCadastroDeMfa", () => {
     }
   });
 
-  it("a plataforma exige do platform admin, e o tenant NÃO o libera", () => {
-    // A superfície do platform admin alcança todos os tenants; não é a
-    // preferência de um deles que a solta. As duas origens SOMAM.
+  it("platform admin não é bloqueado globalmente quando a empresa não exige MFA", () => {
     expect(
       exigeCadastroDeMfa({
         ...BASE,
@@ -46,7 +44,7 @@ describe("exigeCadastroDeMfa", () => {
         plataformaExige: true,
         empresaExige: false,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it("platform admin com a exigência desligada na plataforma não é cobrado", () => {

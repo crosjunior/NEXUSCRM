@@ -14,7 +14,7 @@ export const ENDPOINT_DE_TOKEN = "https://auth.openai.com/api/accounts/oauth/tok
 export const ENDPOINT_DE_JWKS = "https://auth.openai.com/.well-known/jwks.json";
 export const REDIRECT_URI_SIWC = "http://127.0.0.1:1455/auth/callback";
 export const ESCOPO_SIWC = "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct";
-export const NOME_DO_CLIENTE_SIWC = "DeskcommCRM";
+export const NOME_DO_CLIENTE_SIWC = "NexusCRM";
 export const CHAVE_DO_HOST_SIWC = "OPENAI_SIWC_EXT_AGENT_HOST_ID";
 
 /** O envelope inteiro continua armazenado cifrado em ai_provider_credentials. */

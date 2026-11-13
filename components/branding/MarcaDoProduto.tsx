@@ -75,14 +75,28 @@ export function LogotipoDoProduto({ nome, className, decorativo = false }: Props
         <rect {...LOGOTIPO.simbolo.modulo} />
       </g>
       <g className={NOME_CLARO_ESCURO}>
-        {LOGOTIPO.nome.map((g) => (
-          <path key={g.transform} transform={g.transform} d={g.d} />
-        ))}
+        <text
+          x="275"
+          y="156"
+          fontSize="94"
+          fontWeight="700"
+          fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          letterSpacing="-2"
+        >
+          Nexus
+        </text>
       </g>
       <g className={SUFIXO_CLARO_ESCURO}>
-        {LOGOTIPO.sufixo.map((g) => (
-          <path key={g.transform} transform={g.transform} d={g.d} />
-        ))}
+        <text
+          x="555"
+          y="156"
+          fontSize="94"
+          fontWeight="700"
+          fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          letterSpacing="-1"
+        >
+          CRM
+        </text>
       </g>
     </svg>
   );

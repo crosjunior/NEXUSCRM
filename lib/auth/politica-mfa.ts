@@ -198,8 +198,8 @@ function papelAlcancado(role: Role | undefined, minimo: PapelMinimoDeMfa): boole
  * não existe, e o bloqueio é imediato.
  */
 export function avaliaPoliticaDeMfa(p: PoliticaDeMfa): ExigenciaDeMfa {
-  if (p.isPlatformAdmin && p.plataformaExige === true) return EXIGE_BLOQUEANDO;
-
+  // MFA é controlada exclusivamente pela política da empresa cadastrada
+  // (organizations.settings.security), nunca forçada globalmente.
   const minimo = papelMinimoEfetivo(p);
   if (!papelAlcancado(p.role, minimo)) return NAO_EXIGE;
 

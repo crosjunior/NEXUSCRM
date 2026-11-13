@@ -80,6 +80,36 @@ async function atualizarRun(
   }
 }
 
+function mensagemAmigavelDeTeste(mensagem: string, t: (s: string) => string): string {
+  const lower = mensagem.toLowerCase();
+  if (lower.includes("high demand") || lower.includes("overloaded") || lower.includes("503") || lower.includes("unavailable")) {
+    return t(
+      "O provedor de IA está com alta demanda temporária (falhou após as tentativas automáticas). Aguarde alguns instantes e tente novamente, ou selecione outro modelo na aba Configuração.",
+    );
+  }
+  if (lower.includes("429") || lower.includes("rate limit") || lower.includes("quota") || lower.includes("resource_exhausted")) {
+    return t(
+      "Limite de requisições ou cota do provedor de IA atingido. Aguarde alguns instantes ou verifique o saldo da sua chave.",
+    );
+  }
+  if (lower.includes("api key") || lower.includes("401") || lower.includes("403") || lower.includes("unauthorized")) {
+    return t(
+      "Credencial recusada pelo provedor de IA. Confira a chave em Agente de IA › Credenciais.",
+    );
+  }
+  if (lower.includes("not found") || lower.includes("404") || lower.includes("does not exist")) {
+    return t(
+      "O modelo selecionado não foi encontrado ou não está liberado para esta chave. Escolha outro modelo na aba Configuração.",
+    );
+  }
+  if (lower.includes("timeout") || lower.includes("aborted") || lower.includes("etimedout")) {
+    return t(
+      "O provedor de IA demorou muito para responder e a tentativa expirou. Tente novamente ou use um modelo mais rápido.",
+    );
+  }
+  return t("Não foi possível executar o teste. Confira modelo, credencial e materiais do agente.");
+}
+
 export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
@@ -235,7 +265,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
     });
     return fail(
       "preview_failed",
-      err instanceof LlmConteudoBloqueadoError ? err.message : t("Não foi possível executar o teste. Confira modelo, credencial e materiais do agente."),
+      err instanceof LlmConteudoBloqueadoError ? err.message : mensagemAmigavelDeTeste(mensagem, t),
       422,
       { requestId },
     );

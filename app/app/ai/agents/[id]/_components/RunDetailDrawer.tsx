@@ -88,12 +88,22 @@ export function RunDetailDrawer({ run, open, onOpenChange }: Props) {
             </dl>
 
             {run.error_code || run.error_message ? (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs">
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs space-y-1">
                 <p className="font-medium text-destructive">
                   {run.error_code ?? t("error")}
                 </p>
+                {run.error_message &&
+                (run.error_message.toLowerCase().includes("high demand") ||
+                  run.error_message.toLowerCase().includes("overloaded") ||
+                  run.error_message.includes("503")) ? (
+                  <p className="text-foreground font-medium">
+                    {t(
+                      "O provedor de IA está com alta demanda temporária (falhou após 3 tentativas automáticas). Aguarde alguns instantes ou teste outro modelo.",
+                    )}
+                  </p>
+                ) : null}
                 {run.error_message ? (
-                  <p className="mt-1 whitespace-pre-wrap">{run.error_message}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{run.error_message}</p>
                 ) : null}
               </div>
             ) : null}

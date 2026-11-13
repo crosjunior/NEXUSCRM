@@ -461,6 +461,8 @@ export function AgentForm(props: Props) {
     // usuário de errar é a primeira coisa que ele vê nesta tela.
     if (form.name.trim().length === 0) errors.name = t("Dê um nome para este agente.");
     if (form.name.length > 120) errors.name = t("O nome pode ter até 120 caracteres.");
+    if (form.description.length > 2000)
+      errors.description = `${t("A descrição tem")} ${form.description.length.toLocaleString("pt-BR")} ${t("caracteres, e o máximo é 2.000. Reduza para conseguir salvar.")}`;
     // A rota REST já cobra `0..1000` (`app/api/v1/ai/agents/[id]/route.ts:90`).
     // Sem a mesma régua aqui, o número inválido só reprovaria no servidor e o
     // aviso chegaria como erro genérico, depois de a versão já ter sido gravada.
@@ -587,7 +589,10 @@ export function AgentForm(props: Props) {
         // sido gravada.
         const cadastro = agentMcpPatchSchema.safeParse(toCadastroPayload(form));
         if (!cadastro.success) {
-          toast.error(t("Validação falhou."));
+          const flat = cadastro.error.flatten();
+          const firstErr = Object.entries(flat.fieldErrors)[0];
+          const errDetail = firstErr ? `${firstErr[0]}: ${firstErr[1]?.[0]}` : "";
+          toast.error(errDetail ? `${t("Validação falhou")} (${errDetail})` : t("Validação falhou."));
           return;
         }
         const res = await saveAgentDraftAction(
@@ -854,7 +859,12 @@ export function AgentForm(props: Props) {
               ) : null}
             </div>
             <div className="space-y-1">
-              <Label htmlFor="description">{t("Descrição")}</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="description">{t("Descrição")}</Label>
+                <span className="text-[10px] text-muted-foreground">
+                  {form.description.length}/2.000
+                </span>
+              </div>
               <Textarea
                 id="description"
                 value={form.description}
@@ -862,7 +872,15 @@ export function AgentForm(props: Props) {
                 disabled={disabled}
                 rows={2}
                 maxLength={2000}
+                className={validation.description ? "border-destructive" : undefined}
               />
+              {validation.description ? (
+                <p className="text-xs text-destructive">{validation.description}</p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  {t("Breve resumo para a equipe (não é o prompt — o prompt vai em 'As instruções dele').")}
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <Label htmlFor="priority">{t("Ordem de preferência (0 a 1000)")}</Label>

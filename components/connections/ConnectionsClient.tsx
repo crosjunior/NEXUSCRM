@@ -61,6 +61,8 @@ import { fonteDeTemplates } from "@/lib/channels/templates-fonte";
 import { useT } from "@/hooks/i18n/useT";
 import { AgendaDePausa } from "@/components/connections/AgendaDePausa";
 import { RenomearConexao } from "./RenomearConexao";
+import { EvolutionWhatsAppCard } from "./EvolutionWhatsAppCard";
+import type { ConnectionEngine } from "@/lib/channels/evolution/types";
 
 type Variant = "success" | "warning" | "error" | "neutral";
 
@@ -208,6 +210,7 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
   const tagDoIdioma = useTagDeIdioma();
   const t = useT();
   const qc = useQueryClient();
+  const [qrEngine, setQrEngine] = useState<ConnectionEngine>("evolution");
   const {
     data: sessions,
     isLoading,
@@ -387,7 +390,11 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <EvolutionWhatsAppCard onEngineChange={setQrEngine} />
+
+      {(qrEngine === "waha" || list.length > 0) && (
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
         <p className="text-sm text-muted-foreground">
           {isError
             ? t("Não foi possível carregar seus números.")
@@ -499,7 +506,7 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
         else toast.error(t("Não foi possível copiar. Selecione e copie manualmente."));
       }}>{t("Copiar detalhes")}</Button></details>}
       <Link href="/app/settings/atendimento" className="text-sm underline max-md:flex max-md:min-h-11 max-md:items-center">{t("Configurar responsáveis por número")}</Link>
-      {!wahaConfigured && (
+      {qrEngine === "waha" && !wahaConfigured && (
         <div className="rounded-md border border-warning bg-warning-bg p-4 text-sm text-warning-fg">
           <p className="font-medium">{t("O serviço do WhatsApp não está configurado.")}</p>
           <p className="mt-1">
@@ -710,6 +717,8 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
           onConnected={handleConnected}
           onForcePair={forcePair}
         />
+      )}
+        </>
       )}
     </div>
   );

@@ -135,6 +135,26 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
   const [contactPhone, setContactPhone] = React.useState("");
   const [pending, setPending] = React.useState(false);
   const [result, setResult] = React.useState<TestResponse["data"] | null>(null);
+  const [testError, setTestError] = React.useState<string | null>(null);
+  const [elapsedSec, setElapsedSec] = React.useState(0);
+  const abortRef = React.useRef<AbortController | null>(null);
+
+  React.useEffect(() => {
+    if (!pending) {
+      setElapsedSec(0);
+      return;
+    }
+    const id = setInterval(() => {
+      setElapsedSec((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [pending]);
+
+  React.useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   if (!target) {
     return (
@@ -149,14 +169,28 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
       ? `v${target.version_number} ${t("(publicada)")}`
       : `v${target.version_number} ${t("(rascunho)")}`;
 
+  function handleStop() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setPending(false);
+    setTestError(
+      t("Teste interrompido manualmente. Você já retomou o controle da tela."),
+    );
+    toast.info(t("Teste interrompido."));
+  }
+
   async function handleRun() {
     if (!message.trim()) {
       toast.error(t("Informe uma mensagem de teste."));
       return;
     }
     if (!target) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setPending(true);
     setResult(null);
+    setTestError(null);
     try {
       const body: Record<string, unknown> = { sample_message: message.trim() };
       if (contactName.trim() || contactPhone.trim()) {
@@ -178,18 +212,32 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
         //
         // 120s é o teto do orçamento de passos do agente, não um chute
         // confortável: acima disso o problema é o agente, não a espera.
-        { timeoutMs: 120_000 },
+        { timeoutMs: 120_000, signal: controller.signal },
       );
       setResult(res.data);
       qc.invalidateQueries({ queryKey: agentRunsKey(agent.id) });
       toast.success(t("Teste executado."));
     } catch (err) {
-      if (err instanceof ApiError) {
-        toast.error(t(err.message) || `${t("Erro")}: ${err.code}`);
-      } else {
-        toast.error(t("Erro inesperado."));
+      if (controller.signal.aborted) {
+        return;
       }
+      const msg =
+        err instanceof ApiError
+          ? err.code === "timeout"
+            ? t(
+                "O provedor de IA demorou mais de 120s para responder. Tente novamente ou use um modelo mais rápido.",
+              )
+            : t(err.message) || `${t("Erro")}: ${err.code}`
+          : err instanceof Error && err.message
+            ? err.message
+            : t("Erro inesperado.");
+      setTestError(msg);
+      toast.error(msg);
+      qc.invalidateQueries({ queryKey: agentRunsKey(agent.id) });
     } finally {
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
       setPending(false);
     }
   }
@@ -253,9 +301,16 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
           </div>
         </div>
 
-        <Button onClick={handleRun} disabled={pending || readOnly} className="self-start">
-          {pending ? t("Executando…") : t("Executar teste")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button onClick={handleRun} disabled={pending || readOnly}>
+            {pending ? `${t("Executando…")} (${elapsedSec}s)` : t("Executar teste")}
+          </Button>
+          {pending ? (
+            <Button type="button" variant="destructive" onClick={handleStop}>
+              {t("Parar teste")}
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">
@@ -263,12 +318,34 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
           {t("Resultado")}
         </p>
 
-        {!result && !pending ? (
+        {!result && !pending && !testError ? (
           <p className="text-sm text-muted-foreground">{t("Nenhum teste executado ainda.")}</p>
         ) : null}
 
+        {testError && !pending ? (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs space-y-1.5">
+            <p className="font-medium text-destructive">{testError}</p>
+            <p className="text-muted-foreground">
+              {t("Para ver o erro técnico completo (modelo, credencial ou ferramenta), abra a aba Execuções e clique no registro mais recente com falha.")}
+            </p>
+          </div>
+        ) : null}
+
         {pending ? (
-          <p className="text-sm text-muted-foreground">{t("Executando dry-run…")}</p>
+          <div className="rounded-md border border-border/60 bg-muted/40 p-3 text-xs space-y-1.5">
+            <p className="font-medium text-foreground">
+              {t("Executando teste no provedor de IA…")} ({elapsedSec}s)
+            </p>
+            <p className="text-muted-foreground">
+              {elapsedSec >= 10
+                ? t(
+                    "A resposta está demorando — o motor realiza até 3 tentativas automáticas caso o provedor esteja com alta demanda. Você pode clicar em 'Parar teste' a qualquer momento.",
+                  )
+                : t(
+                    "Processando prompt, base de conhecimento e regras de segurança (limite de 120s e até 3 tentativas automáticas).",
+                  )}
+            </p>
+          </div>
         ) : null}
 
         {result ? (

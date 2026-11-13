@@ -52,7 +52,10 @@ export function AgentWizard({ context }: Props) {
   // Estado do Formulário Wizard
   const [form, setForm] = useState<AgentWizardInput>({
     agentName: `Sofia - Atendente ${context.organizationName}`,
-    channelSessionId: context.channels[0]?.id || null,
+    channelSessionId:
+      context.channels.find((c) => c.status === "WORKING")?.id ||
+      context.channels[0]?.id ||
+      null,
     targetAudience:
       context.brandIdentity?.target_audience ||
       t("Clientes e leads interessados nos serviços e produtos da empresa"),
@@ -337,6 +340,57 @@ export function AgentWizard({ context }: Props) {
               <p className="text-xs text-muted-foreground">
                 {t("Um nome humano ou amigável aumenta em até 35% o engajamento e a taxa de resposta dos leads.")}
               </p>
+            </div>
+
+            {/* Seletor de Canal de Atendimento */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">{t("Canal de Atendimento (WhatsApp)")}</label>
+              {context.channels.length === 0 ? (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-300 flex items-start gap-3">
+                  <Warning size={18} aria-hidden className="shrink-0 mt-0.5 text-amber-400" />
+                  <div>
+                    <div className="font-semibold">{t("Nenhum canal conectado nesta organização")}</div>
+                    <p className="mt-1 text-muted-foreground">
+                      {t("Para colocar o agente em produção, conecte um número pelo QR Code em Canais › Conexões.")}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {context.channels.map((ch) => {
+                    const isSelected = form.channelSessionId === ch.id;
+                    const isWorking = ch.status === "WORKING";
+                    return (
+                      <div
+                        key={ch.id}
+                        onClick={() => setForm({ ...form, channelSessionId: ch.id })}
+                        className={`cursor-pointer rounded-xl border p-3 transition-all duration-200 ${
+                          isSelected
+                            ? "border-emerald-500 bg-emerald-500/10 shadow-sm"
+                            : "border-border/60 bg-background/30 hover:border-emerald-500/40"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm font-medium text-foreground">{ch.name}</div>
+                          <Badge
+                            variant="outline"
+                            className={
+                              isWorking
+                                ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 text-[10px]"
+                                : "border-amber-500/50 bg-amber-500/10 text-amber-400 text-[10px]"
+                            }
+                          >
+                            {isWorking ? t("Ativo (WORKING)") : ch.status}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5 capitalize">
+                          {ch.channel_type || "WhatsApp"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -691,6 +745,39 @@ export function AgentWizard({ context }: Props) {
                 ))}
               </div>
             </div>
+
+            {/* Canal de Atendimento Vinculado */}
+            <div className="rounded-xl border border-border/60 bg-background/40 p-4 space-y-2">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {t("Canal de Atendimento")}:
+              </div>
+              {context.channels.find((c) => c.id === form.channelSessionId) ? (
+                (() => {
+                  const ch = context.channels.find((c) => c.id === form.channelSessionId)!;
+                  const isWorking = ch.status === "WORKING";
+                  return (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-foreground">📱 {ch.name}</span>
+                      <Badge
+                        variant="outline"
+                        className={
+                          isWorking
+                            ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400 text-[10px]"
+                            : "border-amber-500/50 bg-amber-500/10 text-amber-400 text-[10px]"
+                        }
+                      >
+                        {isWorking ? t("Ativo (WORKING)") : ch.status}
+                      </Badge>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="text-xs text-amber-400 flex items-center gap-1.5">
+                  <Warning size={14} aria-hidden />
+                  {t("Nenhum canal selecionado. Volte ao Passo 1 e selecione um canal conectado.")}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -755,7 +842,7 @@ export function AgentWizard({ context }: Props) {
           <Button
             type="button"
             onClick={handlePublish}
-            disabled={isPublishing}
+            disabled={isPublishing || !form.channelSessionId}
             className="gap-2 bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 px-8 font-semibold"
           >
             {isPublishing ? (

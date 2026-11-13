@@ -7,6 +7,10 @@
 
 import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import {
+  loadOrgWhatsappConnections,
+  syncEvolutionVirtualChannelSession,
+} from "@/lib/channels/evolution/config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { byteaToBuffer, decryptKey } from "@/lib/crypto/aes_gcm";
 import { publishAgentVersion } from "@/lib/ai/agents/publish";
@@ -106,6 +110,14 @@ export async function obterContextoOrganizacao(
 ): Promise<WizardOrganizationContext> {
   const admin = createAdminClient();
 
+  // Garante sincronização de sessão virtual de canais (ex: Evolution API)
+  try {
+    const { connections } = await loadOrgWhatsappConnections(admin, organizationId);
+    await syncEvolutionVirtualChannelSession(admin, organizationId, connections);
+  } catch {
+    // degradação graciosa caso conexão externa ou settings estejam inacessíveis
+  }
+
   const [orgRes, kbRes, pipesRes, stagesRes, channelsRes, credsRes] = await Promise.all([
     admin.from("organizations").select("id, name, niche, settings").eq("id", organizationId).single(),
     admin
@@ -126,9 +138,9 @@ export async function obterContextoOrganizacao(
       .order("order_index", { ascending: true }),
     admin
       .from("channel_sessions")
-      .select("id, name, channel_type, status")
+      .select("id, display_name, phone_number, provider, status")
       .eq("organization_id", organizationId)
-      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: true }),
     admin
       .from("ai_provider_credentials_safe")
@@ -170,8 +182,8 @@ export async function obterContextoOrganizacao(
     pipelines,
     channels: (channelsRes.data ?? []).map((c) => ({
       id: c.id,
-      name: c.name || "Canal WhatsApp/Instagram",
-      channel_type: c.channel_type || "whatsapp",
+      name: c.display_name || c.phone_number || "Canal WhatsApp",
+      channel_type: c.provider || "whatsapp",
       status: c.status,
     })),
     googleCredentialId: credsRes.data?.id ?? null,
@@ -334,10 +346,44 @@ export async function salvarEPublicarAgenteWizard(params: {
   userId: string;
   input: AgentWizardInput;
   blueprint: AgentWizardGeneratedBlueprint;
-}): Promise<{ ok: true; agentId: string; versionId: string } | { ok: false; error: string }> {
+}): Promise<{ ok: true; agentId: string; versionId: string } | { ok: false; error: string; message?: string }> {
   const { organizationId, userId, input, blueprint } = params;
   const admin = createAdminClient();
   const requestId = randomUUID();
+
+  // 0. Valida canal de atendimento antes de criar
+  if (!input.channelSessionId) {
+    return {
+      ok: false,
+      error: "channel_session_not_found",
+      message:
+        "Nenhum canal de atendimento (WhatsApp) foi selecionado. Conecte um canal em Canais › Conexões e selecione-o para ativar o agente.",
+    };
+  }
+
+  const { data: channelSession } = await admin
+    .from("channel_sessions")
+    .select("id, status")
+    .eq("id", input.channelSessionId)
+    .eq("organization_id", organizationId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (!channelSession) {
+    return {
+      ok: false,
+      error: "channel_session_not_found",
+      message: "O canal de atendimento selecionado não foi encontrado nesta organização.",
+    };
+  }
+
+  if (channelSession.status !== "WORKING") {
+    return {
+      ok: false,
+      error: "channel_session_offline",
+      message: `O canal selecionado não está conectado (status: ${channelSession.status}). Conecte ou repare o canal em Canais › Conexões antes de ativar o agente.`,
+    };
+  }
 
   // 1. Obtém credencial do Google para associar à versão
   const { data: cred } = await admin
@@ -367,7 +413,7 @@ export async function salvarEPublicarAgenteWizard(params: {
     .insert({
       organization_id: organizationId,
       name: input.agentName,
-      description: input.objectiveDescription || `Agente de atendimento criado via assistente inteligente para ${input.targetAudience}`,
+      description: (input.objectiveDescription || `Agente de atendimento criado via assistente inteligente para ${input.targetAudience}`).slice(0, 2000),
       model: "gemini-3.5-flash",
       system_prompt: blueprint.systemPrompt,
       kind: "mcp_agent",

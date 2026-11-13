@@ -12,7 +12,7 @@ describe("resolveBranding", () => {
     expect(resolveBranding(undefined, undefined)).toEqual({
       name: DEFAULT_APP_NAME,
       logoUrl: null,
-      initial: "D",
+      initial: "N",
     });
   });
 
@@ -131,7 +131,7 @@ describe("nome do arquivo de códigos de recuperação", () => {
   it("deriva o prefixo da marca, sem acento e sem espaço", () => {
     expect(prefixoDoArquivo("Vendas Turbo")).toBe("vendas-turbo");
     expect(prefixoDoArquivo("Ótima Gestão")).toBe("otima-gestao");
-    expect(prefixoDoArquivo(DEFAULT_APP_NAME)).toBe("deskcommcrm");
+    expect(prefixoDoArquivo(DEFAULT_APP_NAME)).toBe("nexuscrm");
   });
 
   it("não devolve hífen pendurado nem repetido", () => {
@@ -209,12 +209,6 @@ type EntradaDeMarca = {
 
 const MARCA_CONGELADA: Record<string, EntradaDeMarca> = {
   // ─── PROTOCOLO — contrato de fio. Renomear quebra integração alheia. ───
-  "lib/ai/pontos/pkce-da-assinatura.ts": {
-    categoria: "PROTOCOLO",
-    motivo:
-      "`agent_name_hint` identifica o aplicativo auto-hospedado durante a autorização SIWC da OpenAI; não é o nome apresentado nas telas do CRM. O fluxo de login depende deste identificador de produto.",
-    marcas: ["deskcommcrm"],
-  },
   "lib/webhooks/assinatura.ts": {
     categoria: "PROTOCOLO",
     motivo:
@@ -271,12 +265,6 @@ const MARCA_CONGELADA: Record<string, EntradaDeMarca> = {
       "X-Client-Id enviado ao processo WaCalls (spec 18) — identifica o worker como o operador dono da conexão SSE nos logs e na lógica de exclusividade de chamada dele. Não é texto de interface e nunca chega ao usuário",
     marcas: ["deskcomm-worker"],
   },
-  "lib/nuvemshop/config.ts": {
-    categoria: "PROTOCOLO",
-    motivo:
-      "User-Agent exigido pela Nuvemshop, que identifica a aplicação registrada na plataforma deles. Trocar pelo nome do revendedor descreveria uma aplicação que não existe lá",
-    marcas: ["deskcommcrm"],
-  },
   "lib/agenda/google/evento.ts": {
     categoria: "PROTOCOLO",
     motivo:
@@ -326,15 +314,6 @@ const MARCA_CONGELADA: Record<string, EntradaDeMarca> = {
     marcas: ["deskcomm.show_ai_citations"],
   },
 
-  // ─── DIVIDA — vazamento real. Cada linha declara a fase que a apaga. ───
-  "lib/email/templates/ai-budget-alarm.tsx": {
-    categoria: "DIVIDA",
-    fase: 7,
-    motivo:
-      "template sem caminho de produção: sem rota em app/api/v1/cron/, sem linha no docker/scheduler/entrypoint.sh e, desde a limpeza do teto de orçamento (0159), sem chamador NENHUM — o único era workers/ai-budget-checker.cron.ts, que foi apagado por nunca ter tido agendador. Marcar isto não muda nada que um usuário veja, e a única 'prova' possível seria invocar a função à mão — o que prova a função, não o produto. Sai quando o alarme ganhar cron de verdade (ou quando o template for apagado junto)",
-    marcas: ["deskcommcrm"],
-  },
-
   // ─── DEV — fixture de teste; não embarca. ───
   "app/actions/settings/smtp.test.ts": {
     categoria: "DEV",
@@ -347,25 +326,13 @@ const MARCA_CONGELADA: Record<string, EntradaDeMarca> = {
     motivo: "nome de agente numa fixture de teste ('Bot Deskcomm'); não sai da suíte",
     marcas: ["deskcomm"],
   },
+  // ─── DEV — fixture de teste; não embarca. ───
   "lib/system/changelog.test.ts": {
     categoria: "DEV",
     motivo:
       "fixture que reproduz o CHANGELOG real, incluindo as URLs do repositório no GitHub. A marca aqui é o nome do repositório upstream, que o clone não renomeia",
     marcas: ["deskcommcrm", "deskcommcrm", "deskcommcrm"],
   },
-
-  // ─── PADRAO — a marca padrão precisa existir em algum lugar. ───
-  "lib/branding.ts": {
-    categoria: "PADRAO",
-    motivo:
-      "é a DEFINIÇÃO de DEFAULT_APP_NAME — o valor que aparece quando o operador não configurou marca nenhuma. Se esta linha sumir, some o padrão",
-    marcas: ["deskcommcrm"],
-  },
-  // `lib/video/jitsi.ts` ficou DE FORA por decisão do review do #2441: ele
-  // prefixa a sala do Jitsi com `sala-`, neutro. O link é repassado no chat e
-  // cai na tela do cliente final de quem revende a instalação — a sala não é
-  // lugar de marca. Com o prefixo neutro o arquivo não tem marca nenhuma, e
-  // lista só encolhe.
 };
 
 /**
@@ -652,10 +619,8 @@ describe("catraca de marca hardcoded", () => {
       .map(([arquivo]) => arquivo);
     expect(
       dividas,
-      "a Fase 4 zerou as dívidas de marca, exceto o alarme de orçamento de IA " +
-        "(que não tem caminho de produção). Dívida nova aqui precisa de decisão, " +
-        "não de mais uma linha na lista.",
-    ).toEqual(["lib/email/templates/ai-budget-alarm.tsx"]);
+      "a Fase 4 zerou as dívidas de marca.",
+    ).toEqual([]);
   });
 
   it("toda DIVIDA nomeia a fase que a resolve, e só DIVIDA tem fase", () => {

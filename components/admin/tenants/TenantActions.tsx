@@ -1,6 +1,11 @@
 "use client";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api/client";
+import { empresaExigeMfa } from "@/lib/auth/politica-mfa";
 import { SuspendDialog } from "./SuspendDialog";
 import { ReactivateDialog } from "./ReactivateDialog";
 import { DeleteTenantDialog } from "./DeleteTenantDialog";
@@ -34,8 +39,27 @@ export function TenantActions({ organization, counts }: TenantActionsProps) {
   const [reactivateOpen, setReactivateOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [mfaSaving, setMfaSaving] = useState(false);
+  const queryClient = useQueryClient();
+  const router = useRouter();
 
   const { id: organizationId, status, display_name: displayName } = organization;
+  const mfaRequired = empresaExigeMfa(organization.settings);
+
+  async function handleToggleMfa() {
+    setMfaSaving(true);
+    try {
+      const next = !mfaRequired;
+      await apiClient.patch(`/api/v1/admin/tenants/${organizationId}/mfa`, { enabled: next });
+      await queryClient.invalidateQueries({ queryKey: ["admin", "tenant", organizationId] });
+      router.refresh();
+      toast.success(next ? t("MFA obrigatório ativado para a empresa.") : t("MFA obrigatório desativado para a empresa."));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("Não foi possível atualizar a política de MFA."));
+    } finally {
+      setMfaSaving(false);
+    }
+  }
   const canSuspend = status === "active";
   const isSuspended = status === "suspended";
   // Nulo vale como administrativa (lib/organizacao/operante.ts). A por
@@ -63,6 +87,21 @@ export function TenantActions({ organization, counts }: TenantActionsProps) {
         {!isRedacted && (
           <Button className="w-full" variant="outline" onClick={() => setEditOpen(true)}>
             {t("Editar dados")}
+          </Button>
+        )}
+
+        {!isRedacted && (
+          <Button
+            className="w-full"
+            variant="outline"
+            disabled={mfaSaving}
+            onClick={handleToggleMfa}
+          >
+            {mfaSaving
+              ? t("Salvando MFA...")
+              : mfaRequired
+                ? t("Desativar MFA obrigatório")
+                : t("Ativar MFA obrigatório")}
           </Button>
         )}
 

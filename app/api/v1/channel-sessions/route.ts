@@ -11,6 +11,7 @@ import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 
 import { connectWahaChannel, ChannelConnectionError } from "@/lib/channels/connect-waha";
+import { loadOrgWhatsappConnections } from "@/lib/channels/evolution/config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { mfaEmDivida } from "@/lib/auth/server";
 import { ok, fail } from "@/lib/api/wrappers";
@@ -95,6 +96,17 @@ export async function POST(req: NextRequest): Promise<Response> {
   const t = (texto: string) => traduzir(texto, authz.user.idioma);
   const { user, org: activeOrg } = authz;
   if (await mfaEmDivida()) return fail("mfa_required", t("Confirme a verificação em duas etapas."), 403, { requestId });
+
+  const adminClient = createAdminClient();
+  const { connections } = await loadOrgWhatsappConnections(adminClient, activeOrg.orgId);
+  if (connections.evolution.status === "connected") {
+    return fail(
+      "state_conflict",
+      t("Desconecte a Evolution API antes de conectar uma sessão WAHA."),
+      409,
+      { requestId },
+    );
+  }
 
   const waha = getWahaClient();
   if (!waha) {

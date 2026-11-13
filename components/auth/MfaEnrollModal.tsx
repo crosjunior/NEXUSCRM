@@ -72,9 +72,25 @@ export function MfaEnrollModal({ motivo = "obrigatorio" }: { motivo?: "obrigator
       (res) => {
         if (!res.ok) {
           if (res.error === "verify_failed" || res.error === "invalid_code") {
-            setError(t("Código inválido. Tente novamente."));
+            setError(
+              res.message
+                ? `${t("Código inválido. Tente novamente.")} (${res.message})`
+                : t("Código inválido. Tente novamente."),
+            );
+          } else if (res.error === "service_unavailable") {
+            setError(
+              t("Serviço de segurança indisponível no servidor (chave de serviço não configurada)."),
+            );
+          } else if (res.error === "recovery_codes_failed") {
+            setError(t("Não foi possível gravar os códigos de recuperação. Tente confirmar novamente."));
+          } else if (res.error === "mfa_required") {
+            setError(t("É necessário confirmar o fator MFA atual antes de cadastrar outro."));
           } else {
-            setError(t("Falha ao confirmar. Tente novamente."));
+            setError(
+              res.message
+                ? `${t("Falha ao confirmar.")} ${res.message}`
+                : t("Falha ao confirmar. Tente novamente."),
+            );
           }
           setCode("");
           return;
