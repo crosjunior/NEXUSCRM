@@ -136,6 +136,7 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
   const [pending, setPending] = React.useState(false);
   const [result, setResult] = React.useState<TestResponse["data"] | null>(null);
   const [testError, setTestError] = React.useState<string | null>(null);
+  const [testErrorDetail, setTestErrorDetail] = React.useState<string | null>(null);
   const [elapsedSec, setElapsedSec] = React.useState(0);
   const abortRef = React.useRef<AbortController | null>(null);
 
@@ -176,6 +177,7 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
     setTestError(
       t("Teste interrompido manualmente. Você já retomou o controle da tela."),
     );
+    setTestErrorDetail(null);
     toast.info(t("Teste interrompido."));
   }
 
@@ -191,6 +193,7 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
     setPending(true);
     setResult(null);
     setTestError(null);
+    setTestErrorDetail(null);
     try {
       const body: Record<string, unknown> = { sample_message: message.trim() };
       if (contactName.trim() || contactPhone.trim()) {
@@ -231,6 +234,11 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
           : err instanceof Error && err.message
             ? err.message
             : t("Erro inesperado.");
+      let detail: string | null = null;
+      if (err instanceof ApiError && err.details && typeof err.details.error_message === "string") {
+        detail = err.details.error_message;
+      }
+      setTestErrorDetail(detail);
       setTestError(msg);
       toast.error(msg);
       qc.invalidateQueries({ queryKey: agentRunsKey(agent.id) });
@@ -325,9 +333,15 @@ export function TestPanel({ agent, draft, published, readOnly }: Props) {
         {testError && !pending ? (
           <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs space-y-1.5">
             <p className="font-medium text-destructive">{testError}</p>
-            <p className="text-muted-foreground">
-              {t("Para ver o erro técnico completo (modelo, credencial ou ferramenta), abra a aba Execuções e clique no registro mais recente com falha.")}
-            </p>
+            {testErrorDetail ? (
+              <pre className="mt-1 font-mono text-[11px] text-destructive/80 whitespace-pre-wrap break-all rounded bg-destructive/5 p-2">
+                {testErrorDetail}
+              </pre>
+            ) : (
+              <p className="text-muted-foreground">
+                {t("Para ver o erro técnico completo (modelo, credencial ou ferramenta), abra a aba Execuções e clique no registro mais recente com falha.")}
+              </p>
+            )}
           </div>
         ) : null}
 

@@ -92,12 +92,40 @@ function mensagemAmigavelDeTeste(mensagem: string, t: (s: string) => string): st
       "Limite de requisições ou cota do provedor de IA atingido. Aguarde alguns instantes ou verifique o saldo da sua chave.",
     );
   }
-  if (lower.includes("api key") || lower.includes("401") || lower.includes("403") || lower.includes("unauthorized")) {
+  if (
+    lower.includes("api key") ||
+    lower.includes("api_key_invalid") ||
+    lower.includes("invalid_api_key") ||
+    lower.includes("401") ||
+    lower.includes("403") ||
+    lower.includes("unauthorized") ||
+    lower.includes("permission_denied") ||
+    lower.includes("auth_failed")
+  ) {
     return t(
       "Credencial recusada pelo provedor de IA. Confira a chave em Agente de IA › Credenciais.",
     );
   }
-  if (lower.includes("not found") || lower.includes("404") || lower.includes("does not exist")) {
+  if (
+    lower.includes("sem credencial llm") ||
+    lower.includes("llm_not_configured") ||
+    lower.includes("cadastre uma chave byok")
+  ) {
+    return t(
+      "Nenhuma credencial ativa e validada foi encontrada para este provedor. Confira se a chave foi cadastrada e validada em Agente de IA › Credenciais.",
+    );
+  }
+  if (lower.includes("par provedor+modelo") || lower.includes("pertence ao provedor")) {
+    return t(
+      "O modelo selecionado não pertence ao provedor configurado. Verifique o par Provedor e Modelo na aba Configuração.",
+    );
+  }
+  if (lower.includes("semchavedeembedding") || lower.includes("chave de embedding") || lower.includes("embedding_sem_chave")) {
+    return t(
+      "A base de conhecimento deste agente requer chave de embedding configurada. Cadastre uma chave em Agente de IA › Credenciais.",
+    );
+  }
+  if (lower.includes("not found") || lower.includes("404") || lower.includes("does not exist") || lower.includes("not supported")) {
     return t(
       "O modelo selecionado não foi encontrado ou não está liberado para esta chave. Escolha outro modelo na aba Configuração.",
     );
@@ -267,7 +295,7 @@ export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
       "preview_failed",
       err instanceof LlmConteudoBloqueadoError ? err.message : mensagemAmigavelDeTeste(mensagem, t),
       422,
-      { requestId },
+      { requestId, details: { error_message: mensagem } },
     );
   }
 
