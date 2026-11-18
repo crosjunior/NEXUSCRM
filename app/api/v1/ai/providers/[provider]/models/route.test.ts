@@ -181,6 +181,38 @@ describe("GET /api/v1/ai/providers/:provider/models — o que o agente pode esco
     ]);
   });
 
+  it("não oferece modelos descontinuados pelo provedor (ex: gemini-2.0-flash)", async () => {
+    const catalogoGoogle: LinhaDeModelo[] = [
+      {
+        id: "g1",
+        provider: "google",
+        model_id: "gemini-3.8-flash",
+        display_name: "Gemini 3.8 Flash",
+        supports_tools: true,
+        is_default_for_provider: false,
+      },
+      {
+        id: "g2",
+        provider: "google",
+        model_id: "gemini-2.0-flash",
+        display_name: "Gemini 2.0 Flash",
+        supports_tools: true,
+        is_default_for_provider: false,
+      },
+    ];
+    vi.mocked(createClient).mockResolvedValue(
+      stubDoBanco(catalogoGoogle) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+
+    const res = await listar("google");
+    expect(res.status).toBe(200);
+    const corpo = (await res.json()) as { data: { models: LinhaDeModelo[] } };
+    const ids = corpo.data.models.map((m) => m.model_id);
+
+    expect(ids).toEqual(["gemini-3.8-flash"]);
+    expect(ids).not.toContain("gemini-2.0-flash");
+  });
+
   it("o padrão do provedor continua vindo primeiro", async () => {
     const res = await listar();
     const corpo = (await res.json()) as { data: { models: LinhaDeModelo[] } };

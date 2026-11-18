@@ -28,6 +28,12 @@ export const dynamic = "force-dynamic";
 const MODEL_COLUMNS =
   "id, provider, model_id, display_name, description, context_window, input_price_per_million_cents, output_price_per_million_cents, supports_tools, is_default_for_provider, deprecated_at, released_at";
 
+/** Modelos formalmente descontinuados pelos provedores que não devem ser oferecidos. */
+const MODELOS_DESCONTINUADOS: ReadonlySet<string> = new Set([
+  "gemini-2.0-flash",
+  "gemini-3.1-pro-preview",
+]);
+
 export async function GET(
   _req: NextRequest,
   ctx: { params: Promise<{ provider: string }> },
@@ -115,9 +121,40 @@ export async function GET(
   // jailbreak, que herdam o mesmo modelo (`lib/ai/catalogo/variante-em-lote.ts`).
   // Filtrar AQUI, e não no sincronizador, esconde também as linhas que já
   // estão no catálogo, sem esperar a próxima sincronização.
-  const models = (data ?? []).filter(
-    (m) => m.supports_tools === true && !ehVarianteEmLote(m.model_id),
-  );
+  // Se a organização possui credencial ativa e validada para este provedor,
+  // restringe a lista aos modelos que a API do provedor confirmou como disponíveis.
+  let modelsAvailable: Set<string> | null = null;
+  try {
+    const { data: cred } = await supabase
+      .from("ai_provider_credentials")
+      .select("models_available")
+      .eq("organization_id", activeOrg.orgId)
+      .eq("provider", provider)
+      .eq("is_active", true)
+      .not("validated_at", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (cred && Array.isArray(cred.models_available) && cred.models_available.length > 0) {
+      modelsAvailable = new Set(
+        cred.models_available.map((id: string) => id.replace(/^models\//, "").toLowerCase()),
+      );
+    }
+  } catch {
+    // Falha ou dublê de teste sem a tabela: segue sem o filtro por credencial.
+    modelsAvailable = null;
+  }
+
+  const models = (data ?? []).filter((m) => {
+    if (m.supports_tools !== true || ehVarianteEmLote(m.model_id)) return false;
+    if (MODELOS_DESCONTINUADOS.has(m.model_id)) return false;
+    if (modelsAvailable && modelsAvailable.size > 0) {
+      const idNorm = m.model_id.replace(/^models\//, "").toLowerCase();
+      return modelsAvailable.has(idNorm);
+    }
+    return true;
+  });
 
   return ok({ models }, { requestId });
 }
