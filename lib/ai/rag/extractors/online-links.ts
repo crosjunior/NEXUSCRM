@@ -10,7 +10,7 @@
 
 export interface OnlineLinkInfo {
   url: string;
-  provider: "gdrive" | "onedrive" | "outro";
+  provider: "gdrive" | "onedrive" | "web" | "outro";
   directUrl: string;
   name?: string;
   ext?: string;
@@ -19,15 +19,15 @@ export interface OnlineLinkInfo {
 export interface OnlineLinkValidationResult {
   ok: boolean;
   url: string;
-  provider?: "gdrive" | "onedrive" | "outro";
+  provider?: "gdrive" | "onedrive" | "web" | "outro";
   name?: string;
   ext?: string;
   sizeBytes?: number;
   error?: string;
 }
 
-/** Detecta se o link é do Google Drive ou OneDrive. */
-export function detectProvider(url: string): "gdrive" | "onedrive" | "outro" {
+/** Detecta se o link é do Google Drive, OneDrive ou Página da Web/Artigo. */
+export function detectProvider(url: string): "gdrive" | "onedrive" | "web" {
   const u = url.toLowerCase();
   if (u.includes("drive.google.com") || u.includes("docs.google.com")) {
     return "gdrive";
@@ -35,7 +35,62 @@ export function detectProvider(url: string): "gdrive" | "onedrive" | "outro" {
   if (u.includes("1drv.ms") || u.includes("onedrive.live.com") || u.includes("sharepoint.com")) {
     return "onedrive";
   }
-  return "outro";
+  return "web";
+}
+
+/**
+ * Converte HTML de websites, artigos e blogs em texto Markdown legível.
+ */
+export function extrairTextoDeHtml(html: string): { titulo: string; texto: string } {
+  const titleMatch = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+  const titulo = titleMatch?.[1]?.replace(/\s+/g, " ").trim() || "Página da Web";
+
+  let limpo = html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ")
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, " ")
+    .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, " ")
+    .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, " ")
+    .replace(/<!--[\s\S]*?-->/g, " ");
+
+  const articleMatch =
+    /<article\b[^>]*>([\s\S]*?)<\/article>/i.exec(limpo) ||
+    /<main\b[^>]*>([\s\S]*?)<\/main>/i.exec(limpo);
+
+  if (articleMatch?.[1] && articleMatch[1].length > 300) {
+    limpo = articleMatch[1];
+  } else {
+    limpo = limpo
+      .replace(/<header\b[^>]*>[\s\S]*?<\/header>/gi, " ")
+      .replace(/<footer\b[^>]*>[\s\S]*?<\/footer>/gi, " ")
+      .replace(/<nav\b[^>]*>[\s\S]*?<\/nav>/gi, " ")
+      .replace(/<aside\b[^>]*>[\s\S]*?<\/aside>/gi, " ");
+  }
+
+  limpo = limpo
+    .replace(/<h[1-2]\b[^>]*>([\s\S]*?)<\/h[1-2]>/gi, "\n\n# $1\n")
+    .replace(/<h[3-6]\b[^>]*>([\s\S]*?)<\/h[3-6]>/gi, "\n\n## $1\n")
+    .replace(/<p\b[^>]*>([\s\S]*?)<\/p>/gi, "\n$1\n")
+    .replace(/<li\b[^>]*>([\s\S]*?)<\/li>/gi, "\n* $1")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<hr\s*\/?>/gi, "\n---\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec));
+
+  const linhas = limpo
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  return {
+    titulo,
+    texto: linhas.join("\n\n").trim(),
+  };
 }
 
 /**
@@ -161,6 +216,28 @@ export async function testOnlineLinkAccess(rawUrl: string): Promise<OnlineLinkVa
       } catch {
         filename = filenameMatch[1].replace(/["']/g, "").trim();
       }
+    }
+
+    // Links da Web (sites, blogs, artigos)
+    if (provider === "web" && contentType.includes("text/html")) {
+      const sampleText = await res.text();
+      const { titulo, texto } = extrairTextoDeHtml(sampleText);
+      if (texto.length < 20) {
+        return {
+          ok: false,
+          url,
+          provider,
+          error: "A página web não contém texto legível ou bloqueia leitura automatizada.",
+        };
+      }
+      return {
+        ok: true,
+        url,
+        provider,
+        name: titulo || "Página da Web",
+        ext: "html",
+        sizeBytes: texto.length,
+      };
     }
 
     // Google Drive retorna HTML quando o acesso é restrito ou exige login
@@ -289,10 +366,22 @@ export async function downloadOnlineContent(
     if (matchExt?.[1]) ext = matchExt[1].toLowerCase();
     else if (contentType.includes("pdf")) ext = "pdf";
     else if (contentType.includes("spreadsheet") || contentType.includes("excel")) ext = "xlsx";
+    else if (contentType.includes("presentation") || contentType.includes("powerpoint")) ext = "pptx";
     else if (contentType.includes("word") || contentType.includes("document")) ext = "docx";
     else if (contentType.includes("csv")) ext = "csv";
     else if (contentType.includes("markdown")) ext = "md";
+    else if (contentType.includes("text/html")) ext = "html";
     else ext = "txt";
+  }
+
+  if (contentType.includes("text/html") || ext === "html") {
+    const html = await res.text();
+    const { titulo, texto } = extrairTextoDeHtml(html);
+    return {
+      buffer: Buffer.from(texto, "utf-8"),
+      name: titulo || name,
+      ext: "md",
+    };
   }
 
   const arrayBuffer = await res.arrayBuffer();

@@ -19,9 +19,11 @@ import {
   Cloud,
   FileSpreadsheet,
   FileText,
+  Globe,
   Loader2,
   Paperclip,
   Plus,
+  Presentation,
   X,
 } from "lucide-react";
 
@@ -73,8 +75,14 @@ function formatBytes(bytes?: number): string {
 
 function renderItemIcon(item: ItemAcervo) {
   const ext = (item.ext || "").toLowerCase();
+  if (item.source_type === "web") {
+    return <Globe className="h-4 w-4 text-emerald-400 shrink-0" />;
+  }
   if (item.source_type === "gdrive" || item.source_type === "onedrive") {
     return <Cloud className="h-4 w-4 text-sky-400 shrink-0" />;
+  }
+  if (ext === "pptx") {
+    return <Presentation className="h-4 w-4 text-orange-400 shrink-0" />;
   }
   if (ext === "xlsx" || ext === "csv") {
     return <FileSpreadsheet className="h-4 w-4 text-emerald-400 shrink-0" />;
@@ -128,17 +136,27 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const EXTENSOES_VALIDAS = ["pdf", "docx", "xlsx", "csv", "txt", "md"];
+    const EXTENSOES_VALIDAS = ["pdf", "docx", "xlsx", "csv", "txt", "md", "pptx"];
     const novos: ItemAcervo[] = [];
 
     for (const file of files) {
       const ext = file.name.split(".").pop()?.toLowerCase() || "";
       if (!EXTENSOES_VALIDAS.includes(ext)) {
         toast.error(
-          t(`O arquivo "${file.name}" tem formato não suportado. Use PDF, DOCX, XLSX, CSV, TXT ou MD.`),
+          t(`O arquivo "${file.name}" tem formato não suportado. Use PDF, DOCX, XLSX, PPTX, CSV, TXT ou MD.`),
         );
         continue;
       }
+
+      // Validação de arquivo duplicado por nome e tamanho (em MB / bytes)
+      const jaExiste = itensDocumento.some(
+        (it) => it.name.toLowerCase() === file.name.toLowerCase() && it.size_bytes === file.size,
+      );
+      if (jaExiste) {
+        toast.warning(t(`O arquivo "${file.name}" já foi adicionado.`));
+        continue;
+      }
+
       novos.push({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         name: file.name,
@@ -165,20 +183,36 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
 
     if (urls.length === 0) return;
 
-    const novos: ItemAcervo[] = urls.map((u) => {
+    const novos: ItemAcervo[] = [];
+    for (const u of urls) {
+      const isDrive = u.toLowerCase().includes("drive.google.com") || u.toLowerCase().includes("docs.google.com");
       const isOneDrive =
         u.toLowerCase().includes("1drv.ms") ||
         u.toLowerCase().includes("onedrive.live.com") ||
         u.toLowerCase().includes("sharepoint.com");
-      return {
+      const sourceType = isOneDrive ? "onedrive" : isDrive ? "gdrive" : "web";
+
+      // Validação de link duplicado
+      const jaExiste = itensDocumento.some((it) => (it.url || it.name).toLowerCase() === u.toLowerCase());
+      if (jaExiste) {
+        toast.warning(t(`O link "${u}" já foi adicionado.`));
+        continue;
+      }
+
+      novos.push({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         name: u,
-        source_type: isOneDrive ? "onedrive" : "gdrive",
-        ext: "txt",
+        source_type: sourceType,
+        ext: sourceType === "web" ? "html" : "txt",
         status: "validating",
         url: u,
-      };
-    });
+      });
+    }
+
+    if (novos.length === 0) {
+      setLinksInput("");
+      return;
+    }
 
     setItensDocumento((prev) => [...prev, ...novos]);
     setLinksInput("");
@@ -312,7 +346,11 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
         }
 
         const linksConfirmados = itensDocumento
-          .filter((it) => (it.source_type === "gdrive" || it.source_type === "onedrive") && it.url)
+          .filter(
+            (it) =>
+              (it.source_type === "gdrive" || it.source_type === "onedrive" || it.source_type === "web") &&
+              it.url,
+          )
           .map((it) => ({
             url: it.url,
             name: it.name,
@@ -327,9 +365,36 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
           method: "POST",
           body: formData,
         });
-        const json = (await res.json()) as { error?: { message?: string } };
+        const json = (await res.json()) as {
+          error?: {
+            message?: string;
+            details?: { failed_file?: string; error_message?: string };
+          };
+        };
         if (!res.ok) {
-          toast.error(json.error?.message ? t(json.error.message) : t("Não consegui guardar os arquivos."));
+          const failedFileName = json.error?.details?.failed_file;
+          const msg = json.error?.message || t("Não consegui guardar os arquivos.");
+
+          if (failedFileName) {
+            // Invalida especificamente o arquivo problemático na lista
+            setItensDocumento((prev) =>
+              prev.map((it) =>
+                it.name.toLowerCase() === failedFileName.toLowerCase()
+                  ? {
+                      ...it,
+                      status: "error",
+                      errorMessage:
+                        t("Não foi possível ler o texto deste arquivo (imagem/ilegível). Remova-o no X."),
+                    }
+                  : it,
+              ),
+            );
+            toast.error(
+              t(`O arquivo "${failedFileName}" não pôde ser lido. Remova-o da lista para continuar.`),
+            );
+          } else {
+            toast.error(t(msg));
+          }
           return;
         }
       } else {
@@ -367,7 +432,7 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
 
   return (
     <Dialog open={aberto} onOpenChange={(v) => !v && onFechar()}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl">
+      <DialogContent className="flex max-h-[90vh] flex-col w-full sm:max-w-4xl lg:max-w-5xl">
         <DialogHeader>
           <DialogTitle>{t("Ensinar algo novo ao agente")}</DialogTitle>
           <DialogDescription>
@@ -376,9 +441,31 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
         </DialogHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+          {/* Nome da Base de Conhecimento - Primeiro item do modal */}
+          <div className="space-y-2">
+            <Label htmlFor="material-nome" className="font-semibold text-sm">
+              {t("Nome da Base de Conhecimento")}
+            </Label>
+            <Input
+              id="material-nome"
+              data-testid="material-nome"
+              placeholder={
+                tipo === "faq"
+                  ? t("Perguntas frequentes da loja")
+                  : tipo === "link"
+                    ? t("Manual online / Artigo")
+                    : t("Ex: Manual de Produtos, Políticas e Atendimento")
+              }
+              value={nome}
+              onChange={(e) => setNome(e.target.value)}
+              disabled={enviando || porRotina}
+            />
+          </div>
+
+          {/* Cards de Que tipo de material é - 3 por linha responsivo */}
           <div className="space-y-2">
             <Label>{t("Que tipo de material é")}</Label>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2" data-testid="material-tipos">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3" data-testid="material-tipos">
               {TIPOS_DE_FONTE.map((tf) => {
                 const rotina = ePreenchidoPorRotina(tf.id);
                 const marcado = tipo === tf.id;
@@ -390,13 +477,15 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
                     onClick={() => setTipo(tf.id)}
                     data-testid={`material-tipo-${tf.id}`}
                     className={[
-                      "rounded-lg border p-3 text-left text-sm transition",
+                      "rounded-lg border p-3 text-left text-sm transition flex flex-col justify-between",
                       marcado ? "border-accent bg-accent/10" : "border-border hover:bg-surface",
                       rotina ? "cursor-not-allowed opacity-50" : "",
                     ].join(" ")}
                   >
-                    <span className="font-medium">{t(tf.rotulo)}</span>
-                    <span className="mt-1 block text-xs text-text-muted">{t(tf.oQueE)}</span>
+                    <div>
+                      <span className="font-medium block">{t(tf.rotulo)}</span>
+                      <span className="mt-1 block text-xs text-text-muted leading-relaxed">{t(tf.oQueE)}</span>
+                    </div>
                   </button>
                 );
               })}
@@ -404,26 +493,6 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
             {porRotina && meta?.comoChega ? (
               <p className="text-xs text-text-muted">{t(meta.comoChega)}</p>
             ) : null}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="material-nome">
-              {tipo === "link" ? t("Nome ou título (opcional)") : t("Nome do material")}
-            </Label>
-            <Input
-              id="material-nome"
-              data-testid="material-nome"
-              placeholder={
-                tipo === "faq"
-                  ? t("Perguntas frequentes da loja")
-                  : tipo === "link"
-                    ? t("Manual online / Artigo")
-                    : t("Política de troca e atendimento")
-              }
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              disabled={enviando || porRotina}
-            />
           </div>
 
           {tipo === "link" ? (
@@ -445,7 +514,7 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
             </div>
           ) : null}
 
-          {/* DOCUMENTO: Seção rica com múltiplos arquivos e links Google Drive / OneDrive */}
+          {/* DOCUMENTO: Seção rica com múltiplos arquivos e links Google Drive / OneDrive / Web */}
           {tipo === "documento" ? (
             <div className="space-y-3 pt-1">
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -458,13 +527,13 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
                     </Label>
                   </div>
                   <p className="text-[11px] text-text-muted">
-                    {t("PDF, DOCX, XLSX, CSV, Markdown (.md) e TXT.")}
+                    {t("PDF, DOCX, XLSX, PPTX, CSV, Markdown (.md) e TXT.")}
                   </p>
                   <input
                     ref={inputArquivo}
                     type="file"
                     multiple
-                    accept=".pdf,.docx,.xlsx,.csv,.txt,.md"
+                    accept=".pdf,.docx,.xlsx,.pptx,.csv,.txt,.md"
                     className="hidden"
                     onChange={handleSelectFiles}
                     disabled={enviando}
@@ -482,12 +551,12 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
                   </Button>
                 </div>
 
-                {/* Links Google Drive / OneDrive */}
+                {/* Links Google Drive / OneDrive / Sites Web */}
                 <div className="rounded-lg border border-border p-3 space-y-2 bg-surface/40">
                   <div className="flex items-center gap-1.5">
                     <Cloud className="h-3.5 w-3.5 text-sky-400" />
                     <Label className="text-xs font-semibold uppercase tracking-wider text-text-muted">
-                      {t("Drive ou OneDrive")}
+                      {t("Drive, OneDrive ou Sites/Artigos")}
                     </Label>
                   </div>
                   <p className="text-[11px] text-text-muted">
@@ -495,7 +564,7 @@ export function NovoMaterialDialog({ aberto, onFechar, onCriado, podeIndexar }: 
                   </p>
                   <div className="flex gap-1.5">
                     <Input
-                      placeholder="https://drive.google.com/... ; ..."
+                      placeholder="https://drive.google.com/... ; https://exemplo.com/artigo"
                       value={linksInput}
                       onChange={(e) => setLinksInput(e.target.value)}
                       onKeyDown={(e) => {

@@ -8,9 +8,11 @@ import {
   Cloud,
   FileSpreadsheet,
   FileText,
+  Globe,
   Loader2,
   Paperclip,
   Plus,
+  Presentation,
   Trash2,
   X,
 } from "lucide-react";
@@ -37,7 +39,7 @@ export type ItemStatus = "validating" | "confirmed" | "error";
 export interface ItemAcervo {
   id: string;
   name: string;
-  source_type: "upload" | "gdrive" | "onedrive";
+  source_type: "upload" | "gdrive" | "onedrive" | "web";
   ext: string;
   size_bytes?: number;
   status: ItemStatus;
@@ -50,7 +52,7 @@ export interface ItemAcervo {
   // Para links online:
   url?: string;
   direct_url?: string;
-  provider?: "gdrive" | "onedrive" | "outro";
+  provider?: "gdrive" | "onedrive" | "web" | "outro";
 }
 
 interface Props {
@@ -72,8 +74,14 @@ function formatBytes(bytes?: number): string {
 
 function renderItemIcon(item: ItemAcervo) {
   const ext = (item.ext || "").toLowerCase();
+  if (item.source_type === "web") {
+    return <Globe className="h-5 w-5 text-emerald-400 shrink-0" />;
+  }
   if (item.source_type === "gdrive" || item.source_type === "onedrive") {
     return <Cloud className="h-5 w-5 text-sky-400 shrink-0" />;
+  }
+  if (ext === "pptx") {
+    return <Presentation className="h-5 w-5 text-orange-400 shrink-0" />;
   }
   if (ext === "xlsx" || ext === "csv") {
     return <FileSpreadsheet className="h-5 w-5 text-emerald-400 shrink-0" />;
@@ -158,15 +166,24 @@ export function DocumentoEditorDialog({
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const EXTENSOES_VALIDAS = ["pdf", "docx", "xlsx", "csv", "txt", "md"];
+    const EXTENSOES_VALIDAS = ["pdf", "docx", "xlsx", "csv", "txt", "md", "pptx"];
     const novosItens: ItemAcervo[] = [];
 
     for (const file of files) {
       const ext = file.name.split(".").pop()?.toLowerCase() || "";
       if (!EXTENSOES_VALIDAS.includes(ext)) {
         toast.error(
-          t(`O arquivo "${file.name}" tem formato não suportado. Use PDF, DOCX, XLSX, CSV, TXT ou MD.`),
+          t(`O arquivo "${file.name}" tem formato não suportado. Use PDF, DOCX, XLSX, PPTX, CSV, TXT ou MD.`),
         );
+        continue;
+      }
+
+      // Validação de arquivo duplicado por nome e tamanho (em MB / bytes)
+      const jaExiste = itens.some(
+        (it) => it.name.toLowerCase() === file.name.toLowerCase() && it.size_bytes === file.size,
+      );
+      if (jaExiste) {
+        toast.warning(t(`O arquivo "${file.name}" já está presente na lista.`));
         continue;
       }
 
@@ -185,7 +202,7 @@ export function DocumentoEditorDialog({
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  // Adição e teste imediato de links online (Google Drive / OneDrive)
+  // Adição e teste imediato de links online (Google Drive / OneDrive / Sites Web)
   async function handleAddLinks() {
     const raw = linksInput.trim();
     if (!raw) return;
@@ -198,21 +215,36 @@ export function DocumentoEditorDialog({
 
     if (urls.length === 0) return;
 
-    const novosItens: ItemAcervo[] = urls.map((url) => {
+    const novosItens: ItemAcervo[] = [];
+    for (const url of urls) {
       const isDrive = url.toLowerCase().includes("drive.google.com") || url.toLowerCase().includes("docs.google.com");
       const isOneDrive =
         url.toLowerCase().includes("1drv.ms") ||
         url.toLowerCase().includes("onedrive.live.com") ||
         url.toLowerCase().includes("sharepoint.com");
-      return {
+      const sourceType = isOneDrive ? "onedrive" : isDrive ? "gdrive" : "web";
+
+      // Validação de link duplicado
+      const jaExiste = itens.some((it) => (it.url || it.name).toLowerCase() === url.toLowerCase());
+      if (jaExiste) {
+        toast.warning(t(`O link "${url}" já foi adicionado.`));
+        continue;
+      }
+
+      novosItens.push({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         name: url,
-        source_type: isOneDrive ? "onedrive" : isDrive ? "gdrive" : "gdrive",
-        ext: "txt",
+        source_type: sourceType,
+        ext: sourceType === "web" ? "html" : "txt",
         status: "validating",
         url,
-      };
-    });
+      });
+    }
+
+    if (novosItens.length === 0) {
+      setLinksInput("");
+      return;
+    }
 
     setItens((prev) => [...prev, ...novosItens]);
     setLinksInput("");
@@ -327,7 +359,11 @@ export function DocumentoEditorDialog({
 
       // Links online confirmados
       const linksConfirmados = itens
-        .filter((it) => (it.source_type === "gdrive" || it.source_type === "onedrive") && it.url)
+        .filter(
+          (it) =>
+            (it.source_type === "gdrive" || it.source_type === "onedrive" || it.source_type === "web") &&
+            it.url,
+        )
         .map((it) => ({
           url: it.url,
           name: it.name,
@@ -343,9 +379,36 @@ export function DocumentoEditorDialog({
         body: formData,
       });
 
-      const json = (await res.json()) as { error?: { message?: string } };
+      const json = (await res.json()) as {
+        error?: {
+          message?: string;
+          details?: { failed_file?: string; error_message?: string };
+        };
+      };
       if (!res.ok) {
-        toast.error(json.error?.message ? t(json.error.message) : t("Não foi possível salvar a base."));
+        const failedFileName = json.error?.details?.failed_file;
+        const msg = json.error?.message || t("Não foi possível salvar a base.");
+
+        if (failedFileName) {
+          // Invalida o arquivo específico com status error para que o usuário possa removê-lo
+          setItens((prev) =>
+            prev.map((it) =>
+              it.name.toLowerCase() === failedFileName.toLowerCase()
+                ? {
+                    ...it,
+                    status: "error",
+                    errorMessage:
+                      t("Não foi possível ler o texto deste arquivo (imagem/ilegível). Remova-o no X."),
+                  }
+                : it,
+            ),
+          );
+          toast.error(
+            t(`O arquivo "${failedFileName}" não pôde ser lido. Remova-o da lista para continuar.`),
+          );
+        } else {
+          toast.error(t(msg));
+        }
         return;
       }
 
@@ -366,22 +429,24 @@ export function DocumentoEditorDialog({
 
   return (
     <Dialog open={aberto} onOpenChange={(v) => !v && onFechar()}>
-      <DialogContent className="flex max-h-[90vh] flex-col sm:max-w-3xl">
+      <DialogContent className="flex max-h-[90vh] flex-col w-full sm:max-w-4xl lg:max-w-5xl">
         <DialogHeader>
           <DialogTitle>
-            {sourceId ? t("Editar base de conhecimento") : t("Adicionar base de conhecimento")}
+            {sourceId ? t("Editar Base de Conhecimento") : t("Adicionar Base de Conhecimento")}
           </DialogTitle>
           <DialogDescription>
             {t(
-              "Adicione até 30 arquivos ou links do Google Drive e OneDrive (limite de 500 MB). Todos os arquivos são lidos e indexados para consulta do assistente.",
+              "Adicione até 30 arquivos ou links do Google Drive, OneDrive e Sites Web (limite de 500 MB). Todos os arquivos são lidos e indexados para consulta do assistente.",
             )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto pr-1">
-          {/* Nome da base */}
+          {/* Nome da base - Primeiro item */}
           <div className="space-y-1.5">
-            <Label htmlFor="base-nome">{t("Nome da base de conhecimento")}</Label>
+            <Label htmlFor="base-nome" className="font-semibold text-sm">
+              {t("Nome da Base de Conhecimento")}
+            </Label>
             <Input
               id="base-nome"
               placeholder={t("Ex: Manual de Produtos, Políticas e Atendimento")}
@@ -398,17 +463,17 @@ export function DocumentoEditorDialog({
               <div className="flex items-center gap-2">
                 <Paperclip className="h-4 w-4 text-accent" />
                 <Label className="font-medium text-xs uppercase tracking-wider text-text-muted">
-                  {t("Arquivos do computador")}
+                  {t("Arquivos locais")}
                 </Label>
               </div>
               <p className="text-xs text-text-muted">
-                {t("Permitidos: PDF, DOCX, XLSX, CSV, Markdown (.md) e TXT.")}
+                {t("Permitidos: PDF, DOCX, XLSX, PPTX, CSV, Markdown (.md) e TXT.")}
               </p>
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
-                accept=".pdf,.docx,.xlsx,.csv,.txt,.md"
+                accept=".pdf,.docx,.xlsx,.pptx,.csv,.txt,.md"
                 className="hidden"
                 onChange={handleSelectFiles}
                 disabled={salvando}
@@ -426,12 +491,12 @@ export function DocumentoEditorDialog({
               </Button>
             </div>
 
-            {/* 2. Links Google Drive / OneDrive */}
+            {/* 2. Links Google Drive / OneDrive / Sites Web */}
             <div className="rounded-lg border border-border p-3.5 space-y-2.5 bg-surface/50">
               <div className="flex items-center gap-2">
                 <Cloud className="h-4 w-4 text-sky-400" />
                 <Label className="font-medium text-xs uppercase tracking-wider text-text-muted">
-                  {t("Google Drive ou OneDrive")}
+                  {t("Drive, OneDrive ou Sites/Artigos")}
                 </Label>
               </div>
               <p className="text-xs text-text-muted">
@@ -439,7 +504,7 @@ export function DocumentoEditorDialog({
               </p>
               <div className="flex gap-2">
                 <Input
-                  placeholder="https://drive.google.com/... ; https://1drv.ms/..."
+                  placeholder="https://drive.google.com/... ; https://exemplo.com/artigo"
                   value={linksInput}
                   onChange={(e) => setLinksInput(e.target.value)}
                   onKeyDown={(e) => {

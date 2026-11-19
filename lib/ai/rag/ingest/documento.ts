@@ -16,6 +16,7 @@ import { extractPdfText, PdfExtractError } from "@/lib/ai/rag/extractors/pdf";
 import { extractCsvText, CsvExtractError } from "@/lib/ai/rag/extractors/csv";
 import { extractDocxText, DocxExtractError } from "@/lib/ai/rag/extractors/docx";
 import { extractXlsxText, XlsxExtractError } from "@/lib/ai/rag/extractors/xlsx";
+import { extractPptxText, PptxExtractError } from "@/lib/ai/rag/extractors/pptx";
 
 /** Bucket privado onde os arquivos de conhecimento vivem (nome histórico). */
 export const BUCKET_DE_CONHECIMENTO = "ai-policy";
@@ -23,7 +24,7 @@ export const BUCKET_DE_CONHECIMENTO = "ai-policy";
 /**
  * Extensões aceitas para documentos de conhecimento.
  */
-export const EXTENSOES_ACEITAS = ["pdf", "md", "txt", "csv", "docx", "xlsx"] as const;
+export const EXTENSOES_ACEITAS = ["pdf", "md", "txt", "csv", "docx", "xlsx", "pptx"] as const;
 export type ExtensaoAceita = (typeof EXTENSOES_ACEITAS)[number];
 
 /**
@@ -32,11 +33,13 @@ export type ExtensaoAceita = (typeof EXTENSOES_ACEITAS)[number];
 export class ErroDeExtracao extends Error {
   readonly code = "extracao_falhou";
   readonly detalhe?: string;
+  readonly failedFile?: string;
 
-  constructor(message: string, detalhe?: string) {
+  constructor(message: string, detalhe?: string, failedFile?: string) {
     super(message);
     this.name = "ErroDeExtracao";
     this.detalhe = detalhe;
+    this.failedFile = failedFile;
   }
 }
 
@@ -61,6 +64,12 @@ export function resolverExtensao(
     mimeType === "application/vnd.ms-excel"
   ) {
     return "xlsx";
+  }
+  if (
+    mimeType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+    mimeType === "application/vnd.ms-powerpoint"
+  ) {
+    return "pptx";
   }
   return null;
 }
@@ -127,6 +136,18 @@ export async function extrairTextoDeBuffer(
         err instanceof Error ? err.message : String(err),
       );
     }
+  } else if (extensao === "pptx") {
+    try {
+      texto = extractPptxText(buffer);
+    } catch (err) {
+      if (err instanceof PptxExtractError) {
+        throw new ErroDeExtracao("Falha ao processar apresentação PowerPoint (PPTX).", err.message);
+      }
+      throw new ErroDeExtracao(
+        "Falha ao processar apresentação PowerPoint (PPTX).",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
   } else {
     try {
       texto = extractMarkdownText(buffer);
@@ -159,7 +180,7 @@ export async function extrairTextoDoArquivo(
   if (!extensao) {
     const extBruta = (extensaoDeclarada ?? blobPath.split(".").pop() ?? "?").toLowerCase();
     throw new ErroDeExtracao(
-      "Não sei ler esse tipo de arquivo. Envie PDF, DOCX, XLSX, Markdown (.md), CSV (.csv) ou texto (.txt).",
+      "Não sei ler esse tipo de arquivo. Envie PDF, DOCX, XLSX, PPTX, Markdown (.md), CSV (.csv) ou texto (.txt).",
       extBruta || extensaoDeclarada || blobPath.split(".").pop() || "extensão desconhecida",
     );
   }

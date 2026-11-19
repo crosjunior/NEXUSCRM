@@ -45,12 +45,13 @@ const MIME_POR_EXTENSAO = {
   csv: "text/csv",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 } as const;
 
 interface ItemArquivo {
   id: string;
   name: string;
-  source_type: "upload" | "gdrive" | "onedrive";
+  source_type: "upload" | "gdrive" | "onedrive" | "web";
   blob_path?: string;
   ext?: string;
   size_bytes?: number;
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest): Promise<Response> {
     name?: string;
     ext?: string;
     sizeBytes?: number;
-    provider?: "gdrive" | "onedrive" | "outro";
+    provider?: "gdrive" | "onedrive" | "web" | "outro";
     directUrl?: string;
   }> = [];
   if (linksRaw && typeof linksRaw === "string") {
@@ -222,9 +223,10 @@ export async function POST(req: NextRequest): Promise<Response> {
           throw new ErroDeExtracao(
             `Erro ao ler ${file.name}: ${extractErr.message}`,
             extractErr.detalhe,
+            file.name,
           );
         }
-        throw new Error(`Falha ao ler o arquivo ${file.name}.`);
+        throw new ErroDeExtracao(`Falha ao ler o arquivo ${file.name}.`, undefined, file.name);
       }
 
       novosArquivosSalvos.push({
@@ -243,7 +245,13 @@ export async function POST(req: NextRequest): Promise<Response> {
       await admin.storage.from(BUCKET_DE_CONHECIMENTO).remove(blobsCriadosParaLimpeza);
     }
     if (err instanceof ErroDeExtracao) {
-      return fail("unprocessable_entity", t(err.message), 422, { requestId });
+      return fail("unprocessable_entity", t(err.message), 422, {
+        requestId,
+        details: {
+          failed_file: err.failedFile,
+          error_message: err.message,
+        },
+      });
     }
     return fail("internal_error", err instanceof Error ? t(err.message) : "Erro ao ler o arquivo.", 500, {
       requestId,
@@ -254,7 +262,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   const itensLinks: ItemArquivo[] = linksArray.map((l) => ({
     id: randomUUID(),
     name: l.name ?? "Arquivo Online",
-    source_type: l.provider === "onedrive" ? "onedrive" : "gdrive",
+    source_type: l.provider === "onedrive" ? "onedrive" : l.provider === "web" ? "web" : "gdrive",
     ext: l.ext ?? "txt",
     size_bytes: l.sizeBytes,
     url: l.url,
