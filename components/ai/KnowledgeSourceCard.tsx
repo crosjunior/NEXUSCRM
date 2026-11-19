@@ -28,10 +28,14 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   BookOpen,
+  Eye,
   FileText,
   HelpCircle,
   MessageSquare,
   Package,
+  Pencil,
+  Power,
+  PowerOff,
   RefreshCw,
   Trash2,
 } from "lucide-react";
@@ -112,6 +116,10 @@ export function KnowledgeSourceCard({
 
   const derived = deriveBadgeStatus(source);
   const arquivado = derived === "archived";
+  const estaAtivaEValida =
+    source.is_active &&
+    !arquivado &&
+    (derived === "ready" || (source.status === "ready" && (source.chunks_count ?? 0) > 0));
   const mostraErro =
     (derived === "failed" || derived === "sem_credencial") && source.last_index_error;
   const temTrechos = (source.chunks_count ?? 0) > 0;
@@ -120,9 +128,9 @@ export function KnowledgeSourceCard({
     <Card className="flex h-full flex-col" data-testid={`material-${source.id}`}>
       <CardHeader>
         <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <Icon className="h-5 w-5 shrink-0 text-accent" aria-hidden />
-            <CardTitle className="text-base">
+            <CardTitle className="text-base truncate">
               {/* O nome é a porta mais óbvia para ler o material: quem olha a
                   grade clica no título antes de procurar um botão. */}
               {href ? (
@@ -138,7 +146,32 @@ export function KnowledgeSourceCard({
               )}
             </CardTitle>
           </div>
-          <SourceStatusBadge source={source} />
+          <div className="flex items-center gap-1.5 shrink-0">
+            {estaAtivaEValida ? (
+              <div
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-xs font-semibold shadow-sm shadow-emerald-500/10"
+                title={t("Base de conhecimento ativa e funcionando")}
+                data-testid={`material-status-ativo-${source.id}`}
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <Power className="h-3.5 w-3.5 text-emerald-400" aria-hidden />
+                <span>{t("Ativa")}</span>
+              </div>
+            ) : (
+              <div
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface border border-border/80 text-text-muted text-xs font-medium"
+                title={t("Base desligada ou aguardando preparação")}
+                data-testid={`material-status-desligado-${source.id}`}
+              >
+                <PowerOff className="h-3.5 w-3.5 text-text-muted/80" aria-hidden />
+                <span>{t("Desligada")}</span>
+              </div>
+            )}
+            <SourceStatusBadge source={source} />
+          </div>
         </div>
         <p className="text-sm text-text-muted">
           {meta?.rotulo ? t(meta.rotulo) : source.source_type}
@@ -178,116 +211,129 @@ export function KnowledgeSourceCard({
         ) : null}
       </CardContent>
 
-      <CardFooter className="flex flex-wrap gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          disabled={arquivado || isReindexing}
-          onClick={onReindex}
-          data-testid={`material-reindexar-${source.id}`}
-        >
-          <RefreshCw
-            className={`mr-2 h-3.5 w-3.5 ${isReindexing ? "animate-spin" : ""}`}
-            aria-hidden
-          />
-          {isReindexing ? t("Preparando…") : t("Preparar de novo")}
-        </Button>
-
-        {/* ABRIR O MATERIAL — ler o que está guardado nele. Fica ANTES de "Ver o
-            que ele aprendeu" porque a pergunta da tela é "o que tem neste
-            material?", e os trechos do índice respondem outra pergunta. */}
-        {href ? (
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={href} data-testid={`material-abrir-${source.id}`}>
-              <FileText className="mr-2 h-3.5 w-3.5" aria-hidden />
-              {t("Ler o material")}
-            </Link>
-          </Button>
-        ) : null}
-
-        {temTrechos ? (
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setVendoTrechos(true)}
-              data-testid={`material-ver-${source.id}`}
-            >
-              {t("Ver o que ele aprendeu")}
-            </Button>
-            {/* Montado só quando aberto: o diálogo faz `useQuery`, e mantê-lo
-                no ar fechado custa um observer por cartão numa tela que lista
-                dezenas deles. */}
-            {vendoTrechos ? (
-              <TrechosDoMaterialDialog
-                sourceId={source.id}
-                nome={source.name}
-                aberto
-                onFechar={() => setVendoTrechos(false)}
-              />
-            ) : null}
-          </>
-        ) : null}
-
-        {/* A ação nasce do TIPO: só quem guarda pergunta/resposta tem o que
-            editar no editor de FAQ. Um documento (texto corrido) não tem. */}
-        {ePerguntaEResposta(tipo) && !arquivado ? (
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setEditando(true)}
-              data-testid={`material-editar-${source.id}`}
-            >
-              {t("Editar conteúdo")}
-            </Button>
-            {editando ? (
-              <EditarFaqDialog
-                sourceId={source.id}
-                nome={source.name}
-                aberto
-                onFechar={() => setEditando(false)}
-                onSalvo={onMudou}
-              />
-            ) : null}
-          </>
-        ) : null}
-
-        {/* Edição de base de conhecimento / documentos e links */}
-        {(tipo === "documento" || tipo === "link") && !arquivado ? (
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setEditandoDocumento(true)}
-              data-testid={`material-editar-documento-${source.id}`}
-            >
-              {t("Editar")}
-            </Button>
-            {editandoDocumento ? (
-              <DocumentoEditorDialog
-                sourceId={source.id}
-                nomeInicial={source.name}
-                sourceMetadata={source.source_metadata as Record<string, unknown>}
-                aberto
-                onFechar={() => setEditandoDocumento(false)}
-                onSalvo={onMudou}
-              />
-            ) : null}
-          </>
-        ) : null}
-
-        {!arquivado ? (
+      <CardFooter className="pt-2.5 pb-3 border-t border-border/40 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex items-center gap-1.5 min-w-max">
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
-            onClick={onArquivar}
-            data-testid={`material-arquivar-${source.id}`}
+            disabled={arquivado || isReindexing}
+            onClick={onReindex}
+            data-testid={`material-reindexar-${source.id}`}
+            className="h-8 px-2.5 text-xs shrink-0 flex items-center gap-1.5"
           >
-            <Trash2 className="mr-2 h-3.5 w-3.5" aria-hidden />
-            {t("Arquivar")}
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${isReindexing ? "animate-spin" : ""}`}
+              aria-hidden
+            />
+            <span>{isReindexing ? t("Preparando…") : t("Preparar")}</span>
           </Button>
-        ) : null}
+
+          {/* ABRIR O MATERIAL — ler o que está guardado nele. */}
+          {href ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              asChild
+              className="h-8 px-2.5 text-xs shrink-0 flex items-center gap-1.5"
+            >
+              <Link href={href} data-testid={`material-abrir-${source.id}`}>
+                <FileText className="h-3.5 w-3.5 text-text-muted" aria-hidden />
+                <span>{t("Ler material")}</span>
+              </Link>
+            </Button>
+          ) : null}
+
+          {temTrechos ? (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setVendoTrechos(true)}
+                data-testid={`material-ver-${source.id}`}
+                className="h-8 px-2.5 text-xs shrink-0 flex items-center gap-1.5"
+              >
+                <Eye className="h-3.5 w-3.5 text-accent" aria-hidden />
+                <span>{t("Ver o que aprendeu")}</span>
+              </Button>
+              {/* Montado só quando aberto: o diálogo faz `useQuery`, e mantê-lo
+                  no ar fechado custa um observer por cartão numa tela que lista
+                  dezenas deles. */}
+              {vendoTrechos ? (
+                <TrechosDoMaterialDialog
+                  sourceId={source.id}
+                  nome={source.name}
+                  aberto
+                  onFechar={() => setVendoTrechos(false)}
+                />
+              ) : null}
+            </>
+          ) : null}
+
+          {/* A ação nasce do TIPO: só quem guarda pergunta/resposta tem o que
+              editar no editor de FAQ. Um documento (texto corrido) não tem. */}
+          {ePerguntaEResposta(tipo) && !arquivado ? (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditando(true)}
+                data-testid={`material-editar-${source.id}`}
+                className="h-8 px-2.5 text-xs shrink-0 flex items-center gap-1.5"
+              >
+                <Pencil className="h-3.5 w-3.5 text-text-muted" aria-hidden />
+                <span>{t("Editar")}</span>
+              </Button>
+              {editando ? (
+                <EditarFaqDialog
+                  sourceId={source.id}
+                  nome={source.name}
+                  aberto
+                  onFechar={() => setEditando(false)}
+                  onSalvo={onMudou}
+                />
+              ) : null}
+            </>
+          ) : null}
+
+          {/* Edição de base de conhecimento / documentos e links */}
+          {(tipo === "documento" || tipo === "link") && !arquivado ? (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setEditandoDocumento(true)}
+                data-testid={`material-editar-documento-${source.id}`}
+                className="h-8 px-2.5 text-xs shrink-0 flex items-center gap-1.5"
+              >
+                <Pencil className="h-3.5 w-3.5 text-text-muted" aria-hidden />
+                <span>{t("Editar")}</span>
+              </Button>
+              {editandoDocumento ? (
+                <DocumentoEditorDialog
+                  sourceId={source.id}
+                  nomeInicial={source.name}
+                  sourceMetadata={source.source_metadata as Record<string, unknown>}
+                  aberto
+                  onFechar={() => setEditandoDocumento(false)}
+                  onSalvo={onMudou}
+                />
+              ) : null}
+            </>
+          ) : null}
+
+          {!arquivado ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onArquivar}
+              data-testid={`material-arquivar-${source.id}`}
+              className="h-8 px-2.5 text-xs shrink-0 flex items-center gap-1.5 text-text-muted hover:text-rose-400"
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+              <span>{t("Arquivar")}</span>
+            </Button>
+          ) : null}
+        </div>
       </CardFooter>
     </Card>
   );
