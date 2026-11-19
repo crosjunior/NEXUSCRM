@@ -162,3 +162,25 @@ export function useArquivarSource() {
     },
   });
 }
+
+export function useRestaurarSource() {
+  const t = useT();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ["ai", "knowledge", "sources", "restaurar"],
+    mutationFn: async (id: string) => {
+      await apiClient.patch(`/api/v1/ai/knowledge/sources/${id}`, {
+        status: "ready",
+        is_active: true,
+      });
+      return id;
+    },
+    onSuccess: () => {
+      toast.success(t("Material restaurado com sucesso."));
+    },
+    onError: (err) => showApiError(err),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: sourcesQueryKey() });
+    },
+  });
+}

@@ -34,6 +34,8 @@ const patchSourceSchema = z.object({
   name: z.string().min(2).max(120).optional(),
   items: z.array(faqItemSchema).optional(),
   source_metadata: z.record(z.string(), z.unknown()).optional(),
+  status: z.enum(["ready", "archived", "pending", "failed"]).optional(),
+  is_active: z.boolean().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -172,6 +174,21 @@ export async function PATCH(
   const updatePayload: Record<string, unknown> = {};
   if (input.name !== undefined) updatePayload.name = input.name;
   if (input.source_metadata !== undefined) updatePayload.source_metadata = input.source_metadata;
+  if (input.status !== undefined) {
+    updatePayload.status = input.status;
+    if (input.status === "archived") {
+      updatePayload.is_active = false;
+    } else {
+      updatePayload.is_active = input.is_active ?? true;
+    }
+  } else if (input.is_active !== undefined) {
+    updatePayload.is_active = input.is_active;
+    if (!input.is_active) {
+      updatePayload.status = "archived";
+    } else {
+      updatePayload.status = "ready";
+    }
+  }
 
   const admin = createAdminClient();
 
@@ -185,6 +202,27 @@ export async function PATCH(
     if (updateErr) {
       console.error("[ai-knowledge-sources] PATCH update failed:", updateErr.message);
       return fail("internal_error", "Erro ao atualizar fonte.", 500, { requestId });
+    }
+
+    if (updatePayload.status === "archived") {
+      void audit({
+        action: "ai.knowledge_source_archived",
+        actorUserId: authUser.id,
+        organizationId: activeOrg.orgId,
+        resourceType: "ai_knowledge_source",
+        resourceId: sourceId,
+        requestId,
+      });
+    } else if (updatePayload.is_active === true) {
+      void audit({
+        action: "ai.knowledge_source_updated",
+        actorUserId: authUser.id,
+        organizationId: activeOrg.orgId,
+        resourceType: "ai_knowledge_source",
+        resourceId: sourceId,
+        requestId,
+        metadata: { restored: true },
+      });
     }
   }
 
