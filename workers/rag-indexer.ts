@@ -44,7 +44,8 @@ import {
 import { acquireDebounce } from "@/lib/ai/rag/debounce";
 import { chunkText, computeContentHash } from "@/lib/ai/rag/chunker";
 import { canonizarTipoDeFonte } from "@/lib/ai/rag/tipos-de-fonte";
-import { extrairTextoDoArquivo, ErroDeExtracao } from "@/lib/ai/rag/ingest/documento";
+import { extrairTextoDoArquivo, extrairTextoDeBuffer, ErroDeExtracao, type ExtensaoAceita } from "@/lib/ai/rag/ingest/documento";
+import { downloadOnlineContent } from "@/lib/ai/rag/extractors/online-links";
 import { estimateTokens } from "@/lib/ai/runtime/history";
 import { formatProductForRag, type NuvemshopProduct } from "@/lib/ai/rag/format-product";
 import {
@@ -222,7 +223,56 @@ async function pedacosDeDocumento(fonte: FonteRow): Promise<Pedaco[]> {
     blob_path?: string;
     filename?: string;
     ext?: string;
+    files?: Array<{
+      id?: string;
+      name?: string;
+      blob_path?: string;
+      ext?: string;
+      source_type?: string;
+      url?: string;
+    }>;
   };
+
+  // Suporte a múltiplos arquivos e links online (até 30 arquivos)
+  if (Array.isArray(meta.files) && meta.files.length > 0) {
+    const todosPedacos: Pedaco[] = [];
+
+    for (const item of meta.files) {
+      let texto = "";
+      let extensao = (item.ext ?? "txt") as ExtensaoAceita;
+      const nomeArquivo = item.name ?? item.blob_path?.split("/").pop() ?? item.url ?? "documento";
+
+      if (item.blob_path) {
+        const res = await extrairTextoDoArquivo(item.blob_path, item.ext);
+        texto = res.texto;
+        extensao = res.extensao;
+      } else if (item.url) {
+        const online = await downloadOnlineContent(item.url);
+        extensao = (online.ext ?? item.ext ?? "txt") as ExtensaoAceita;
+        texto = await extrairTextoDeBuffer(online.buffer, extensao);
+      }
+
+      if (texto.trim().length > 0) {
+        const pedacosItem = chunkText(texto, { maxChars: 1600, overlapChars: 200 }).map((c) => ({
+          content: `[Documento: ${nomeArquivo}]\n${c}`,
+          metadata: {
+            source_type: "documento",
+            arquivo: nomeArquivo,
+            extensao,
+            origem: item.source_type ?? (item.url ? "link" : "upload"),
+            url: item.url,
+          },
+        }));
+        todosPedacos.push(...pedacosItem);
+      }
+    }
+
+    if (todosPedacos.length === 0) {
+      throw new ErroDeExtracao("Nenhum arquivo da base contém texto legível para indexar.");
+    }
+    return todosPedacos;
+  }
+
   const blobPath = meta.blob_path;
   if (!blobPath) throw new ErroDeExtracao("a fonte não aponta para nenhum arquivo");
 

@@ -41,6 +41,7 @@ import { Button } from "@/components/ui/button";
 import { SourceStatusBadge, deriveBadgeStatus } from "@/components/ai/SourceStatusBadge";
 import { TrechosDoMaterialDialog } from "@/components/ai/TrechosDoMaterialDialog";
 import { EditarFaqDialog } from "@/components/ai/EditarFaqDialog";
+import { DocumentoEditorDialog } from "@/components/ai/DocumentoEditorDialog";
 import {
   TIPO_DE_FONTE_POR_ID,
   canonizarTipoDeFonte,
@@ -103,6 +104,7 @@ export function KnowledgeSourceCard({
   const tagDoIdioma = useTagDeIdioma();
   const [vendoTrechos, setVendoTrechos] = useState(false);
   const [editando, setEditando] = useState(false);
+  const [editandoDocumento, setEditandoDocumento] = useState(false);
 
   const tipo = canonizarTipoDeFonte(source.source_type) ?? "faq";
   const meta = TIPO_DE_FONTE_POR_ID.get(tipo);
@@ -245,6 +247,30 @@ export function KnowledgeSourceCard({
                 nome={source.name}
                 aberto
                 onFechar={() => setEditando(false)}
+                onSalvo={onMudou}
+              />
+            ) : null}
+          </>
+        ) : null}
+
+        {/* Edição de base de conhecimento / documentos e links */}
+        {(tipo === "documento" || tipo === "link") && !arquivado ? (
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setEditandoDocumento(true)}
+              data-testid={`material-editar-documento-${source.id}`}
+            >
+              {t("Editar")}
+            </Button>
+            {editandoDocumento ? (
+              <DocumentoEditorDialog
+                sourceId={source.id}
+                nomeInicial={source.name}
+                sourceMetadata={source.source_metadata as Record<string, unknown>}
+                aberto
+                onFechar={() => setEditandoDocumento(false)}
                 onSalvo={onMudou}
               />
             ) : null}

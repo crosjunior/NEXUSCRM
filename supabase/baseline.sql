@@ -69728,3 +69728,20 @@ update public.ai_models
    set deprecated_at = coalesce(deprecated_at, now())
  where provider = 'google'
    and model_id in ('gemini-2.0-flash', 'gemini-3.1-pro-preview');
+
+
+-- ---------------------------------------------------------------------------
+-- 9051: amplia o bucket ai-policy para aceitar docx, xlsx e limite de 500MB
+-- ---------------------------------------------------------------------------
+update storage.buckets
+set allowed_mime_types = array[
+  'application/pdf',
+  'text/markdown',
+  'text/x-markdown',
+  'text/plain',
+  'text/csv',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+],
+file_size_limit = 524288000
+where id = 'ai-policy';

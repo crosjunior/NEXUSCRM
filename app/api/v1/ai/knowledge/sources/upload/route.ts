@@ -2,23 +2,11 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 /**
  * POST /api/v1/ai/knowledge/sources/upload
  *
- * Envio de arquivo (PDF, Markdown ou texto, até 20 MB) para o acervo da
- * organização. Sobe para o bucket privado, cadastra o material e emite o evento
- * — quem extrai, chunka e embeda é o indexador, no worker.
+ * Envio e gestão de arquivos (PDF, Word DOCX, Excel XLSX, Markdown, CSV ou texto)
+ * e links online (Google Drive, OneDrive) para o acervo da organização.
  *
- * ## O que mudou na 0181
- *
- * Antes esta rota chamava `ingestPolicyFile` "para validar a extração" e aquela
- * função **extraía o texto, chunkava e descartava tudo**, devolvendo só a
- * contagem. O arquivo subia, a fonte nascia `status='ready'`, e não havia
- * caminho nenhum que o transformasse em trecho buscável: o indexador só sabia
- * ler `ai_faq_items`. Somado a isso, a rota **não tinha chamador nenhum na
- * interface** — os dois botões que a substituiriam eram toasts "em breve".
- *
- * Hoje a extração continua acontecendo aqui, mas com outro propósito: recusar
- * na hora o arquivo ilegível, enquanto a pessoa ainda está olhando para a tela.
- * O texto extraído não é guardado — o blob é a fonte da verdade, e o worker o lê
- * de novo na hora de indexar (DIRC: calcular, não duplicar).
+ * Suporta até 30 arquivos por base de conhecimento e até 500 MB de tamanho total cumulativo.
+ * Permite tanto criação de novo material quanto edição de base existente (passando source_id).
  *
  * Auth: sessão por cookie, papel >= manager.
  * `organization_id` sai do JWT — NUNCA do corpo.
@@ -43,10 +31,33 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const TAMANHO_MAXIMO = 20 * 1024 * 1024; // 20 MB
+export const TAMANHO_MAXIMO_TOTAL = 500 * 1024 * 1024; // 500 MB
+export const LIMITE_MAXIMO_ARQUIVOS = 30;
 
 const nameSchema = z.string().trim().min(2).max(120);
 const agentIdSchema = z.string().uuid();
+const sourceIdSchema = z.string().uuid();
+
+const MIME_POR_EXTENSAO = {
+  pdf: "application/pdf",
+  md: "text/markdown",
+  txt: "text/plain",
+  csv: "text/csv",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+} as const;
+
+interface ItemArquivo {
+  id: string;
+  name: string;
+  source_type: "upload" | "gdrive" | "onedrive";
+  blob_path?: string;
+  ext?: string;
+  size_bytes?: number;
+  mime_type?: string;
+  url?: string;
+  direct_url?: string;
+}
 
 export async function POST(req: NextRequest): Promise<Response> {
   const supportDenied = await requireSupportWrite();
@@ -63,17 +74,52 @@ export async function POST(req: NextRequest): Promise<Response> {
   try {
     formData = await req.formData();
   } catch {
-    return fail("invalid_request", t("Falha ao processar o envio do arquivo."), 400, { requestId });
+    return fail("invalid_request", t("Falha ao processar o envio do formulário."), 400, { requestId });
   }
 
-  const fileEntry = formData.get("file");
-  const agentIdRaw = formData.get("agent_id");
   const nameRaw = formData.get("name");
+  const agentIdRaw = formData.get("agent_id");
+  const sourceIdRaw = formData.get("source_id");
+  const linksRaw = formData.get("links");
+  const existingFilesRaw = formData.get("existing_files");
 
-  if (!(fileEntry instanceof File)) {
-    return fail("invalid_request", t("Nenhum arquivo foi enviado."), 400, { requestId });
+  // Arquivos enviados
+  const uploadedFiles: File[] = [];
+  for (const entry of formData.getAll("files")) {
+    if (entry instanceof File && entry.size > 0) uploadedFiles.push(entry);
   }
-  const file = fileEntry;
+  for (const entry of formData.getAll("file")) {
+    if (entry instanceof File && entry.size > 0 && !uploadedFiles.includes(entry)) {
+      uploadedFiles.push(entry);
+    }
+  }
+
+  // Links online parseados
+  let linksArray: Array<{
+    url: string;
+    name?: string;
+    ext?: string;
+    sizeBytes?: number;
+    provider?: "gdrive" | "onedrive" | "outro";
+    directUrl?: string;
+  }> = [];
+  if (linksRaw && typeof linksRaw === "string") {
+    try {
+      linksArray = JSON.parse(linksRaw);
+    } catch {
+      return fail("validation_failed", t("Formato inválido para links online."), 422, { requestId });
+    }
+  }
+
+  // Arquivos já existentes (ao editar)
+  let existingFiles: ItemArquivo[] = [];
+  if (existingFilesRaw && typeof existingFilesRaw === "string") {
+    try {
+      existingFiles = JSON.parse(existingFilesRaw);
+    } catch {
+      return fail("validation_failed", t("Formato inválido para lista de arquivos existentes."), 422, { requestId });
+    }
+  }
 
   const nameParsed = nameSchema.safeParse(nameRaw);
   if (!nameParsed.success) {
@@ -83,9 +129,6 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
   const name = nameParsed.data;
 
-  // `agent_id` virou HISTÓRICO na 0181 e passou a ser opcional: o material é da
-  // organização. Quando vier, continua validado — o id de um agente de outra
-  // organização tem de doer.
   let agentId: string | null = null;
   if (agentIdRaw !== null && String(agentIdRaw).length > 0) {
     const agentIdParsed = agentIdSchema.safeParse(agentIdRaw);
@@ -99,153 +142,241 @@ export async function POST(req: NextRequest): Promise<Response> {
       .eq("id", agentIdParsed.data)
       .eq("organization_id", activeOrg.orgId)
       .maybeSingle();
-    if (agentErr) {
-      console.error("[conhecimento-upload] validação do agente falhou:", agentErr.message);
-      return fail("internal_error", "Erro ao validar agent_id.", 500, { requestId });
-    }
-    if (!agent) {
+    if (agentErr || !agent) {
       return fail("not_found", t("Assistente não encontrado nesta organização."), 404, { requestId });
     }
     agentId = agentIdParsed.data;
   }
 
-  if (file.size > TAMANHO_MAXIMO) {
-    return fail("payload_too_large", "O arquivo passa de 20 MB.", 413, { requestId });
+  let sourceId: string | null = null;
+  if (sourceIdRaw !== null && String(sourceIdRaw).length > 0) {
+    const sParsed = sourceIdSchema.safeParse(sourceIdRaw);
+    if (!sParsed.success) {
+      return fail("validation_failed", t("Campo 'source_id' inválido."), 422, { requestId });
+    }
+    sourceId = sParsed.data;
   }
 
-  const ext = resolverExtensao(file.name, file.type);
-  if (!ext) {
-    const extBruta = file.name.split(".").pop()?.toLowerCase() ?? "";
-    // Mesma instrução de `extrairTextoDoArquivo` — Excel tem caminho de saída
-    // próprio (exportar como CSV), a genérica não ensina isso.
-    if (extBruta === "xlsx" || extBruta === "xls") {
-      return fail(
-        "unsupported_media_type",
-        t(
-          'Não leio Excel diretamente — no Excel use "Salvar como" → "CSV UTF-8 (delimitado por vírgulas)" e envie o CSV.',
-        ),
-        415,
-        { requestId },
-      );
-    }
+  // Total de arquivos = novos uploads + links online + arquivos existentes mantidos
+  const totalItens = uploadedFiles.length + linksArray.length + existingFiles.length;
+  if (totalItens === 0) {
+    return fail("invalid_request", t("Adicione ao menos um arquivo ou link válido."), 400, { requestId });
+  }
+
+  if (totalItens > LIMITE_MAXIMO_ARQUIVOS) {
     return fail(
-      "unsupported_media_type",
-      t("Não sei ler esse tipo de arquivo. Envie PDF, Markdown (.md), CSV (.csv) ou texto (.txt)."),
-      415,
+      "validation_failed",
+      t(`O limite é de até ${LIMITE_MAXIMO_ARQUIVOS} arquivos por base de conhecimento.`),
+      422,
       { requestId },
     );
   }
 
+  // Calcula tamanho total cumulativo
+  let totalBytes = 0;
+  for (const f of uploadedFiles) totalBytes += f.size;
+  for (const f of existingFiles) totalBytes += f.size_bytes ?? 0;
+  for (const l of linksArray) totalBytes += l.sizeBytes ?? 0;
+
+  if (totalBytes > TAMANHO_MAXIMO_TOTAL) {
+    return fail("payload_too_large", t("O tamanho total dos arquivos ultrapassa o limite de 500 MB."), 413, {
+      requestId,
+    });
+  }
+
   const admin = createAdminClient();
-  const blobId = randomUUID();
-  const blobPath = `${activeOrg.orgId}/${blobId}.${ext}`;
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
+  const novosArquivosSalvos: ItemArquivo[] = [];
+  const blobsCriadosParaLimpeza: string[] = [];
 
-  // O MIME vai pela EXTENSÃO resolvida, não pelo que o browser mandou.
-  //
-  // O bucket tem allowlist de MIME (`application/pdf`, `text/markdown`,
-  // `text/x-markdown`, `text/plain`). Um `.md` arrastado de certos sistemas
-  // chega com `type` vazio, e `application/octet-stream` seria RECUSADO pelo
-  // Storage — o upload falharia com uma mensagem que não tem nada a ver com o
-  // que a pessoa fez.
-  const MIME_POR_EXTENSAO = {
-    pdf: "application/pdf",
-    md: "text/markdown",
-    txt: "text/plain",
-    csv: "text/csv",
-  } as const;
-
-  const { error: uploadErr } = await admin.storage
-    .from(BUCKET_DE_CONHECIMENTO)
-    .upload(blobPath, fileBuffer, { contentType: MIME_POR_EXTENSAO[ext], upsert: false });
-
-  if (uploadErr) {
-    console.error("[conhecimento-upload] upload falhou:", uploadErr.message);
-    return fail("internal_error", "Erro ao guardar o arquivo.", 500, { requestId });
-  }
-
-  // Recusar o ilegível ENQUANTO a pessoa olha para a tela. Descobrir isso só
-  // quando o worker rodar transformaria um erro corrigível num silêncio.
   try {
-    await extrairTextoDoArquivo(blobPath, ext);
-  } catch (err) {
-    await admin.storage.from(BUCKET_DE_CONHECIMENTO).remove([blobPath]);
-    if (err instanceof ErroDeExtracao) {
-      // A resposta leva só a chave; a causa só sobrevive neste log.
-      if (err.detalhe) console.warn("[conhecimento-upload] extração recusada:", err.detalhe);
-      return fail("unprocessable_entity", t(err.message), 422, { requestId });
-    }
-    console.error("[conhecimento-upload] extração falhou:", err);
-    return fail("internal_error", "Erro ao ler o arquivo.", 500, { requestId });
-  }
+    for (const file of uploadedFiles) {
+      const ext = resolverExtensao(file.name, file.type);
+      if (!ext) {
+        throw new ErroDeExtracao(
+          "Não sei ler esse tipo de arquivo. Envie PDF, DOCX, XLSX, Markdown (.md), CSV (.csv) ou texto (.txt).",
+          file.name,
+        );
+      }
 
-  const { data: ks, error: ksErr } = await admin
-    .from("ai_knowledge_sources")
-    .insert({
-      organization_id: activeOrg.orgId,
-      agent_id: agentId,
-      source_type: "documento",
-      name,
-      status: "ready",
-      is_active: true,
-      ingested_at: new Date().toISOString(),
-      source_metadata: {
-        filename: file.name,
+      const blobId = randomUUID();
+      const blobPath = `${activeOrg.orgId}/${blobId}.${ext}`;
+      const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+      const contentType = MIME_POR_EXTENSAO[ext] || "application/octet-stream";
+      const { error: uploadErr } = await admin.storage
+        .from(BUCKET_DE_CONHECIMENTO)
+        .upload(blobPath, fileBuffer, { contentType, upsert: false });
+
+      if (uploadErr) {
+        console.error("[conhecimento-upload] upload storage falhou:", uploadErr.message);
+        throw new Error(`Erro ao guardar o arquivo ${file.name}.`);
+      }
+
+      blobsCriadosParaLimpeza.push(blobPath);
+
+      // Valida extração imediata
+      try {
+        await extrairTextoDoArquivo(blobPath, ext);
+      } catch (extractErr) {
+        if (extractErr instanceof ErroDeExtracao) {
+          throw new ErroDeExtracao(
+            `Erro ao ler ${file.name}: ${extractErr.message}`,
+            extractErr.detalhe,
+          );
+        }
+        throw new Error(`Falha ao ler o arquivo ${file.name}.`);
+      }
+
+      novosArquivosSalvos.push({
+        id: randomUUID(),
+        name: file.name,
+        source_type: "upload",
         blob_path: blobPath,
         ext,
-        uploaded_by: authUser.id,
-        mime_type: file.type,
         size_bytes: file.size,
-      },
-    })
-    .select("id")
-    .single();
-
-  if (ksErr || !ks) {
-    await admin.storage.from(BUCKET_DE_CONHECIMENTO).remove([blobPath]);
-    if (ksErr?.code === "23505") {
-      return fail(
-        "knowledge_source_name_in_use",
-        `Já existe um material chamado "${name}". Escolha outro nome.`,
-        409,
-        { requestId },
-      );
+        mime_type: contentType,
+      });
     }
-    console.error("[conhecimento-upload] insert falhou:", ksErr?.message);
-    return fail("internal_error", "Erro ao registrar o material.", 500, { requestId });
+  } catch (err) {
+    // Se falhar algum arquivo, limpa os blobs enviados nesta requisição
+    if (blobsCriadosParaLimpeza.length > 0) {
+      await admin.storage.from(BUCKET_DE_CONHECIMENTO).remove(blobsCriadosParaLimpeza);
+    }
+    if (err instanceof ErroDeExtracao) {
+      return fail("unprocessable_entity", t(err.message), 422, { requestId });
+    }
+    return fail("internal_error", err instanceof Error ? t(err.message) : "Erro ao ler o arquivo.", 500, {
+      requestId,
+    });
   }
 
-  const ksId = (ks as { id: string }).id;
+  // Prepara itens de links online
+  const itensLinks: ItemArquivo[] = linksArray.map((l) => ({
+    id: randomUUID(),
+    name: l.name ?? "Arquivo Online",
+    source_type: l.provider === "onedrive" ? "onedrive" : "gdrive",
+    ext: l.ext ?? "txt",
+    size_bytes: l.sizeBytes,
+    url: l.url,
+    direct_url: l.directUrl,
+  }));
 
-  const { error: emitErr } = await admin.rpc("emit_event" as never, {
-    p_event_type: "knowledge_source.updated",
-    p_entity_kind: "ai_knowledge_source",
-    p_entity_id: ksId,
-    p_payload: { knowledge_source_id: ksId, agent_id: agentId, source_type: "documento" },
-    p_organization_id: activeOrg.orgId,
-  } as never);
+  // Lista consolidada final de arquivos
+  const todosArquivos: ItemArquivo[] = [...existingFiles, ...novosArquivosSalvos, ...itensLinks];
+  const primeiroArquivo = todosArquivos[0];
 
-  if (emitErr) {
-    console.warn("[conhecimento-upload] emit_event falhou (não bloqueia):", emitErr.message);
+  const metadataAtualizado = {
+    files: todosArquivos,
+    total_files: todosArquivos.length,
+    total_size_bytes: totalBytes,
+    // Compatibilidade reversa com leitores legados de arquivo único:
+    filename: primeiroArquivo?.name ?? name,
+    blob_path: primeiroArquivo?.blob_path,
+    ext: primeiroArquivo?.ext,
+    size_bytes: primeiroArquivo?.size_bytes,
+    updated_at: new Date().toISOString(),
+  };
+
+  let finalSourceId = sourceId;
+
+  if (sourceId) {
+    // Modo Edição: atualiza base existente
+    const { error: updErr } = await admin
+      .from("ai_knowledge_sources")
+      .update({
+        name,
+        source_metadata: metadataAtualizado,
+        status: "ready",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sourceId)
+      .eq("organization_id", activeOrg.orgId);
+
+    if (updErr) {
+      console.error("[conhecimento-upload] update falhou:", updErr.message);
+      return fail("internal_error", "Erro ao atualizar a base de conhecimento.", 500, { requestId });
+    }
+
+    void audit({
+      action: "ai.knowledge_source_updated",
+      actorUserId: authUser.id,
+      organizationId: activeOrg.orgId,
+      resourceType: "ai_knowledge_source",
+      resourceId: sourceId,
+      requestId,
+      metadata: { total_files: todosArquivos.length, total_size_bytes: totalBytes },
+    });
+  } else {
+    // Modo Criação: insere nova base
+    const { data: ks, error: ksErr } = await admin
+      .from("ai_knowledge_sources")
+      .insert({
+        organization_id: activeOrg.orgId,
+        agent_id: agentId,
+        source_type: "documento",
+        name,
+        status: "ready",
+        is_active: true,
+        ingested_at: new Date().toISOString(),
+        source_metadata: metadataAtualizado,
+      })
+      .select("id")
+      .single();
+
+    if (ksErr || !ks) {
+      if (blobsCriadosParaLimpeza.length > 0) {
+        await admin.storage.from(BUCKET_DE_CONHECIMENTO).remove(blobsCriadosParaLimpeza);
+      }
+      if (ksErr?.code === "23505") {
+        return fail(
+          "knowledge_source_name_in_use",
+          `Já existe um material chamado "${name}". Escolha outro nome.`,
+          409,
+          { requestId },
+        );
+      }
+      console.error("[conhecimento-upload] insert falhou:", ksErr?.message);
+      return fail("internal_error", "Erro ao registrar o material.", 500, { requestId });
+    }
+
+    finalSourceId = (ks as { id: string }).id;
+
+    void audit({
+      action: "ai.knowledge_source_created",
+      actorUserId: authUser.id,
+      organizationId: activeOrg.orgId,
+      resourceType: "ai_knowledge_source",
+      resourceId: finalSourceId,
+      requestId,
+      metadata: { total_files: todosArquivos.length, total_size_bytes: totalBytes },
+    });
   }
 
-  // Mesmo código da criação em JSON: para a trilha a pergunta é "quem pôs este
-  // material no acervo", não por qual das duas portas ele entrou. Metadados só
-  // com extensão e tamanho — o nome do arquivo pode carregar dado pessoal.
-  void audit({
-    action: "ai.knowledge_source_created",
-    actorUserId: authUser.id,
-    organizationId: activeOrg.orgId,
-    resourceType: "ai_knowledge_source",
-    resourceId: ksId,
-    requestId,
-    metadata: { source_type: "documento", ext, size_bytes: file.size },
-  });
+  // Emite evento para o indexador disparar a indexação com embedding
+  if (finalSourceId) {
+    const { error: emitErr } = await admin.rpc("emit_event" as never, {
+      p_event_type: "knowledge_source.updated",
+      p_entity_kind: "ai_knowledge_source",
+      p_entity_id: finalSourceId,
+      p_payload: { knowledge_source_id: finalSourceId, agent_id: agentId, source_type: "documento" },
+      p_organization_id: activeOrg.orgId,
+    } as never);
+
+    if (emitErr) {
+      console.warn("[conhecimento-upload] emit_event falhou (não bloqueia):", emitErr.message);
+    }
+  }
 
   const temChave = await temChaveDeEmbedding(activeOrg.orgId);
 
   return ok(
-    { id: ksId, blob_path: blobPath, indexacao_habilitada: temChave },
-    { status: 201, requestId },
+    {
+      id: finalSourceId,
+      files: todosArquivos,
+      total_files: todosArquivos.length,
+      total_size_bytes: totalBytes,
+      indexacao_habilitada: temChave,
+    },
+    { status: sourceId ? 200 : 201, requestId },
   );
 }
