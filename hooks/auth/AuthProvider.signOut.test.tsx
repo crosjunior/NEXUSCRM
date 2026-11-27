@@ -91,4 +91,20 @@ describe("AuthProvider.signOut", () => {
     });
     expect(mocks.signOut).toHaveBeenCalledTimes(1);
   });
+
+  it("action que falha (sessão já expirada) leva ao login em vez de lançar", async () => {
+    mocks.signOut.mockRejectedValue(new Error("An unexpected response was received from the server."));
+    const assign = vi.fn();
+    const original = window.location;
+    Object.defineProperty(window, "location", { configurable: true, value: { ...original, assign } });
+    try {
+      montar();
+      await act(async () => {
+        await expect(sair()).resolves.toBeUndefined();
+      });
+      expect(assign).toHaveBeenCalledWith("/login");
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: original });
+    }
+  });
 });

@@ -137,8 +137,8 @@ escaneie o QR code com o WhatsApp do seu número.
 
 ### 🤖 Prefere que uma IA instale pra você?
 
-O repositório traz **guias do assistente** que carregam sozinhos no Claude Code, Codex, Cursor,
-OpenCode ou Antigravity: instalar, montar um cliente por nicho, analisar métricas, afinar o prompt
+O repositório traz **guias do assistente** que carregam sozinhos no Antigravity / Gemini, Codex, Cursor
+ou OpenCode (com espelho para compatibilidade em `.claude/skills/`): instalar, montar um cliente por nicho, analisar métricas, afinar o prompt
 do agente e contribuir. Para tê-los em **qualquer pasta** — inclusive antes de clonar, no seu
 computador —, rode uma vez:
 
@@ -147,8 +147,8 @@ curl -fsSL https://raw.githubusercontent.com/melgarafael/DeskcommCRM/main/script
 ```
 
 Depois abra uma sessão nova do seu assistente e diga *"quero instalar o CRM na minha VPS"*: pedir o
-assunto em português aciona o guia certo em qualquer um dos cinco. Para chamar um guia pelo nome,
-cada um tem o seu jeito — `/deskcomm-instalar` no Claude Code, no Cursor e no Antigravity;
+assunto em português aciona o guia certo em qualquer um deles. Para chamar um guia pelo nome,
+cada um tem o seu jeito — `/deskcomm-instalar` no Antigravity / Gemini e no Cursor;
 `$deskcomm-instalar` no Codex; no OpenCode, peça pelo nome, em linguagem natural.
 
 Os guias **não** se atualizam sozinhos: rodar o mesmo comando de novo traz a versão nova. Para
@@ -158,11 +158,9 @@ desfazer:
 curl -fsSL https://raw.githubusercontent.com/melgarafael/DeskcommCRM/main/scripts/instalar-guias.sh | bash -s -- --remover
 ```
 
-Com o repositório já clonado, os guias vêm dentro dele (`.agents/skills/`) e nem isso é preciso. Se
-você rodou o comando mesmo assim, saiba que no Claude Code o guia instalado vale mais que o do clone
-— e fica na versão do dia em que rodou, até rodar de novo (ou desfazer).
-Também funciona o jeito antigo: jogar só a pasta `hostgator-setup-kit/` no chat do **Claude Code**
-dentro da VPS — ele lê o [`CLAUDE.md`](hostgator-setup-kit/CLAUDE.md) do kit e conduz tudo em português.
+Com o repositório já clonado, os guias vêm dentro dele (`.agents/skills/`) e nem isso é preciso.
+Também funciona usar o chat do **Antigravity / Gemini**
+dentro da VPS — ele lê o kit e conduz tudo em português.
 
 ---
 

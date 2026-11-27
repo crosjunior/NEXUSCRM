@@ -121,6 +121,27 @@
   --shadow-lg: 0 12px 32px -6px rgba(20, 18, 14, 0.1), 0 4px 12px -2px rgba(20, 18, 14, 0.06);
   --shadow-xl: 0 24px 48px -12px rgba(20, 18, 14, 0.16), 0 8px 16px -4px rgba(20, 18, 14, 0.08);
 
+  /* TailAdmin Brand Palette */
+  --color-brand-50: rgba(236, 243, 255, 1);
+  --color-brand-100: rgba(221, 233, 255, 1);
+  --color-brand-200: rgba(194, 214, 255, 1);
+  --color-brand-300: rgba(156, 185, 255, 1);
+  --color-brand-400: rgba(117, 146, 255, 1);
+  --color-brand-500: rgba(70, 95, 255, 1);
+  --color-brand-600: rgba(54, 65, 245, 1);
+  --color-brand-700: rgba(42, 49, 216, 1);
+  --color-brand-800: rgba(37, 45, 174, 1);
+  --color-brand-900: rgba(38, 46, 137, 1);
+  --color-brand-950: rgba(22, 25, 80, 1);
+
+  /* TailAdmin Theme Shadows */
+  --shadow-theme-xs: 0px 1px 2px 0px rgba(16, 24, 40, 0.05);
+  --shadow-theme-sm: 0px 1px 3px 0px rgba(16, 24, 40, 0.1), 0px 1px 2px 0px rgba(16, 24, 40, 0.06);
+  --shadow-theme-md: 0px 4px 8px -2px rgba(16, 24, 40, 0.1), 0px 2px 4px -2px rgba(16, 24, 40, 0.06);
+  --shadow-theme-lg: 0px 12px 16px -4px rgba(16, 24, 40, 0.08), 0px 4px 6px -2px rgba(16, 24, 40, 0.03);
+  --shadow-theme-xl: 0px 20px 24px -4px rgba(16, 24, 40, 0.08), 0px 8px 8px -4px rgba(16, 24, 40, 0.03);
+  --shadow-focus-ring: 0px 0px 0px 4px rgba(70, 95, 255, 0.12);
+
   /* Density — Aerada */
   --density-row: 56px;
   --density-gap: 24px;
@@ -546,8 +567,30 @@
 
   /* Tipografia */
   --font-sans:
-    var(--font-atkinson), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    var(--font-outfit), var(--font-atkinson), Outfit, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-outfit: var(--font-outfit), Outfit, sans-serif;
   --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* TailAdmin Brand */
+  --color-brand-50: var(--color-brand-50);
+  --color-brand-100: var(--color-brand-100);
+  --color-brand-200: var(--color-brand-200);
+  --color-brand-300: var(--color-brand-300);
+  --color-brand-400: var(--color-brand-400);
+  --color-brand-500: var(--color-brand-500);
+  --color-brand-600: var(--color-brand-600);
+  --color-brand-700: var(--color-brand-700);
+  --color-brand-800: var(--color-brand-800);
+  --color-brand-900: var(--color-brand-900);
+  --color-brand-950: var(--color-brand-950);
+
+  /* TailAdmin Shadows */
+  --shadow-theme-xs: var(--shadow-theme-xs);
+  --shadow-theme-sm: var(--shadow-theme-sm);
+  --shadow-theme-md: var(--shadow-theme-md);
+  --shadow-theme-lg: var(--shadow-theme-lg);
+  --shadow-theme-xl: var(--shadow-theme-xl);
+  --shadow-focus-ring: var(--shadow-focus-ring);
 
   /* Espaçamento. Os valores são px LITERAIS (`--space-6` = 24px), não rem — e
      essa diferença é carregada por quem consome: ver o cálculo de altura em
@@ -607,6 +650,61 @@
 }
 @utility duration-spring {
   transition-duration: var(--duration-spring);
+}
+
+/* ---- TailAdmin Utilities (Menu, Scrollbar, Badges) ------------------------ */
+@utility menu-item {
+  @apply relative flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors;
+}
+
+@utility menu-item-active {
+  @apply bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400 font-semibold;
+}
+
+@utility menu-item-inactive {
+  @apply text-gray-700 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200;
+}
+
+@utility menu-item-icon {
+  @apply text-gray-400 group-hover:text-gray-600 dark:text-gray-500;
+}
+
+@utility menu-item-icon-active {
+  @apply text-brand-500 dark:text-brand-400;
+}
+
+@utility menu-dropdown-item {
+  @apply relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors;
+}
+
+@utility menu-dropdown-item-active {
+  @apply bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400;
+}
+
+@utility menu-dropdown-item-inactive {
+  @apply text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/5;
+}
+
+@utility custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: rgba(156, 163, 175, 0.4);
+  }
+}
+
+@utility no-scrollbar {
+  &::-webkit-scrollbar {
+    display: none;
+  }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* ---- Área segura do rodapé (notch e indicador de home) --------------------

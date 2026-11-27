@@ -1,6 +1,6 @@
 import { InterfaceRefresh } from "@/hooks/auth/InterfaceRefresh";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import {
   exigirProvaDeMfa,
   isMfaEnrolled,
@@ -10,6 +10,13 @@ import {
 } from "@/lib/auth/server";
 import { DEFAULT_VISIBILITY_MODE, roleAtLeast, type VisibilityMode } from "@/lib/auth/types";
 import { clientePelaAgendaLigado, clientePelaVendaLigado } from "@/lib/schemas/settings";
+import { homeDaInterface } from "@/lib/navigation/interface";
+import {
+  modulosHabilitadosDaOrganizacao,
+  recursosHabilitadosDaOrganizacao,
+  moduloTenantDaRota,
+  rotaPermitidaPelosModulos,
+} from "@/lib/tenants/modulos-contratados";
 import { AuthProvider } from "@/hooks/auth/AuthProvider";
 import { ProvedorDeCoresDasEtiquetas } from "@/components/tags/CoresDasEtiquetas";
 import { AppShell } from "./_components/AppShell";
@@ -174,6 +181,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // Fonte confiável (admin client, org do cookie validado) — nunca do body.
     const mode = (orgRow?.settings as { visibility_mode?: VisibilityMode } | null)
       ?.visibility_mode;
+    const modulosTenant = modulosHabilitadosDaOrganizacao(orgRow?.settings);
+    const recursosTenant = recursosHabilitadosDaOrganizacao(orgRow?.settings, modulosTenant);
     activeOrg = {
       ...activeOrg,
       visibility_mode: mode ?? DEFAULT_VISIBILITY_MODE,
@@ -186,7 +195,26 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       modulos_ligados: modulos,
       // Mesma linha de `settings` já lida acima — nenhuma consulta a mais.
       capacidades_ligadas: capacidadesLigadas(orgRow?.settings, modulos),
+      modulos_habilitados: modulosTenant,
+      recursos_habilitados: recursosTenant,
     };
+
+    // Bloqueia e redireciona caso o usuário do tenant tente acessar uma rota de módulo ou recurso não liberado
+    const pathname = (await headers()).get("x-pathname");
+    if (pathname && !user.is_platform_admin && !user.support) {
+      if (!rotaPermitidaPelosModulos(pathname, modulosTenant, recursosTenant)) {
+        const destinoHome = homeDaInterface(
+          orgRow?.settings,
+          false,
+          activeOrg.role,
+          modulos,
+          activeOrg.capacidades_ligadas,
+          modulosTenant,
+          recursosTenant,
+        );
+        redirect(pathname === destinoHome ? "/app/settings/profile" : destinoHome);
+      }
+    }
 
     // A faixa do teste grátis (spec da cobrança §9): uma consulta a mais SÓ com
     // a cobrança ligada (quem não administra só vê o atraso). Falha aberta na INFORMAÇÃO: sem a

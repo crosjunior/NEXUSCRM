@@ -15,33 +15,33 @@ interface KPICardProps {
 }
 
 function KPICard({ label, value, subtitle, Icon, accent, danger }: KPICardProps) {
-  const iconColor = danger
-    ? "text-red-500"
+  const iconBg = danger
+    ? "bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400"
     : accent
-      ? "text-amber-500"
-      : "text-muted-foreground";
+      ? "bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400"
+      : "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400";
 
   const valueColor = danger
-    ? "text-red-600"
+    ? "text-red-600 dark:text-red-400"
     : accent
-      ? "text-amber-600"
+      ? "text-amber-600 dark:text-amber-400"
       : "text-foreground";
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-start justify-between gap-2">
-          <div className="space-y-1">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              {label}
-            </p>
-            <p className={`text-3xl font-bold tabular-nums ${valueColor}`}>{value}</p>
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
-          </div>
-          <Icon className={`h-5 w-5 mt-0.5 shrink-0 ${iconColor}`} />
-        </div>
-      </CardContent>
-    </Card>
+    <div className="flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-theme-xs transition-all duration-base hover:shadow-theme-sm">
+      <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${iconBg} [&>svg]:size-6`}>
+        <Icon className="h-6 w-6 shrink-0" />
+      </div>
+      <div className="mt-4">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {label}
+        </span>
+        <h4 className={`mt-1.5 text-3xl font-bold tabular-nums tracking-tight ${valueColor}`}>
+          {value}
+        </h4>
+        <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+      </div>
+    </div>
   );
 }
 

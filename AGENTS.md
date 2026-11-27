@@ -189,8 +189,8 @@ git show origin/main:.github/workflows/e2e.yml | grep -A4 'FORA_DO_CI:'
 
 ## Embedded Assistant Guides
 
-O repositório embute guias em `.agents/skills/` (lidos por Codex, Cursor, OpenCode, Antigravity;
-o Claude Code lê o espelho em `.claude/skills/`). Carregue o guia quando o pedido casar, mesmo que
+O repositório embute guias em `.agents/skills/` (lidos nativamente por Antigravity / Gemini, Codex, Cursor e OpenCode;
+o espelho em `.claude/skills/` mantém compatibilidade). Carregue o guia quando o pedido casar, mesmo que
 a pessoa não saiba que ele existe — `tests/unit/skills-embutidas.test.ts` exige que este arquivo
 cite cada um:
 
@@ -536,8 +536,8 @@ regra de packaging acima se mudou o artefato que o self-hoster instala.
 
 ## Guias do assistente (skills embutidas)
 
-O repositório embute guias em `.agents/skills/` — lidos por Codex, Cursor, OpenCode e
-Antigravity; o Claude Code lê o espelho em `.claude/skills/` (`pnpm skills:sync` regrava, e
+O repositório embute guias em `.agents/skills/` — lidos nativamente por Antigravity / Gemini,
+Codex, Cursor e OpenCode (com espelho em `.claude/skills/` para compatibilidade; `pnpm skills:sync` regrava, e
 `tests/unit/skills-embutidas.test.ts` reprova divergência). Carregue o guia quando o pedido
 casar, mesmo que a pessoa não saiba que ele existe. Fora de um clone (ou num clone antigo),
 `bash scripts/instalar-guias.sh` liga os guias nas pastas globais dos cinco CLIs:

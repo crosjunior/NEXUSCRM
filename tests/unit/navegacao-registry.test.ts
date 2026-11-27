@@ -164,6 +164,7 @@ describe("sidebarGroups", () => {
     expect(ia?.items.map((i) => i.href)).toEqual([
       "/app/ai/agents",
       "/app/ai/followups",
+      "/app/ai/knowledge/sources",
       "/app/ai/cases",
     ]);
   });

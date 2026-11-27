@@ -208,8 +208,11 @@ export async function POST(req: NextRequest) {
   // Adiciona a mensagem atual
   chatMessages.push({ role: "user", content: message });
 
-  // Seleciona o modelo (Gemini como primário, OpenRouter/Llama como secundário)
-  let model = resolveLanguageModel("google/gemini-2.0-flash");
+  // Seleciona o modelo (Gemini como primário absoluto)
+  let model =
+    resolveLanguageModel("google/gemini-2.5-flash") ??
+    resolveLanguageModel("google/gemini-2.0-flash") ??
+    resolveLanguageModel("google/gemini-1.5-flash");
   if (!model && env.OPENROUTER_API_KEY) {
     model = resolveLanguageModel("meta-llama/llama-3.3-70b-instruct");
   }

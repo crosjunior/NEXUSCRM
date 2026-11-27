@@ -136,6 +136,15 @@ export async function proxy(request: NextRequest) {
     }
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname + search);
+
+    // Se for chamada de Server Action sem usuário, responde com redirecionamento de action
+    // para evitar "An unexpected response was received from the server" no client do React.
+    if (request.headers.has("next-action")) {
+      const actionRes = NextResponse.redirect(loginUrl);
+      actionRes.headers.set("X-Action-Redirect", loginUrl.toString());
+      return actionRes;
+    }
+
     return NextResponse.redirect(loginUrl);
   }
 

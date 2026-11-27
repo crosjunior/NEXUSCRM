@@ -57,6 +57,8 @@ export function SidebarContent({
     activeOrg?.interface_settings,
     activeOrg?.modulos_ligados ?? [],
     activeOrg?.capacidades_ligadas ?? [],
+    activeOrg?.modulos_habilitados,
+    activeOrg?.recursos_habilitados,
   );
   // Configurações sai da área que rola e vai para o rodapé fixo: medido em
   // 1280x768, ele caía fora da dobra mesmo em telas de 1080px.
@@ -313,7 +315,7 @@ export function SidebarContent({
                     type="button"
                     onClick={() => toggleGrupo(group.id)}
                     aria-expanded={aberto}
-                    className="flex w-full items-center justify-between rounded-md px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/40 hover:text-foreground"
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground/80 transition-colors hover:bg-gray-100/60 hover:text-foreground dark:hover:bg-white/5"
                   >
                     {t(group.label)}
                     <CaretDown
@@ -346,10 +348,10 @@ export function SidebarContent({
                           aria-current={isActive ? "page" : undefined}
                           onClick={onNavigate}
                           className={cn(
-                            "relative flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
+                            "relative flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors duration-fast",
                             isActive
-                              ? "bg-accent text-accent-foreground"
-                              : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                              ? "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400 font-semibold shadow-theme-xs"
+                              : "text-muted-foreground hover:bg-gray-100 hover:text-foreground dark:hover:bg-white/5",
                             collapsed && "justify-center px-2",
                           )}
                         >
@@ -375,10 +377,10 @@ export function SidebarContent({
                         aria-current={pathname === group.hub.href ? "page" : undefined}
                         onClick={onNavigate}
                         className={cn(
-                          "flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
+                          "flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors duration-fast",
                           pathname === group.hub.href
-                            ? "bg-accent text-accent-foreground"
-                            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                            ? "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400 font-semibold shadow-theme-xs"
+                            : "text-muted-foreground hover:bg-gray-100 hover:text-foreground dark:hover:bg-white/5",
                           collapsed && "justify-center px-2",
                         )}
                       >
@@ -402,10 +404,10 @@ export function SidebarContent({
             aria-current={pathname.startsWith(rodape.href) ? "page" : undefined}
             onClick={onNavigate}
             className={cn(
-              "mb-1 flex items-center gap-3 rounded-md px-3 py-1 text-sm transition-colors",
+              "mb-1 flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition-colors duration-fast",
               pathname.startsWith(rodape.href)
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                ? "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400 font-semibold shadow-theme-xs"
+                : "text-muted-foreground hover:bg-gray-100 hover:text-foreground dark:hover:bg-white/5",
               collapsed && "justify-center px-2",
             )}
           >

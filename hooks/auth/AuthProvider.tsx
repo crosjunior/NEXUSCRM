@@ -95,8 +95,17 @@ export function AuthProvider({
         // Antes da action: o DELETE da inscrição precisa do cookie que ela
         // apaga. `encerrarPushDesteAparelho` nunca lança, então não segura a saída.
         await encerrarPushDesteAparelho();
-        const { signOut } = await import("@/app/actions/auth/signOut");
-        await signOut();
+        try {
+          const { signOut } = await import("@/app/actions/auth/signOut");
+          await signOut();
+        } catch {
+          // Sessão já expirada (refresh token revogado/ausente): o proxy de borda
+          // responde à server action com redirect HTML para /login, e o React
+          // lança "An unexpected response was received from the server". A
+          // pessoa queria sair e já está sem sessão — leva para o login em vez
+          // de mostrar erro.
+          window.location.assign("/login");
+        }
       },
     }),
     [user, activeOrg, refreshing],

@@ -87,7 +87,18 @@ export function UserMenu() {
               <DropdownMenuSeparator />
             </>
           )}
-          <DropdownMenuItem disabled={isPending} onClick={() => startTransition(async () => { await signOut(); })}>
+          <DropdownMenuItem
+            disabled={isPending}
+            onClick={() => {
+              startTransition(async () => {
+                try {
+                  await signOut();
+                } catch {
+                  window.location.assign("/login");
+                }
+              });
+            }}
+          >
             <SignOut size={16} className="mr-2" aria-hidden />
             {t("Sair")}
           </DropdownMenuItem>

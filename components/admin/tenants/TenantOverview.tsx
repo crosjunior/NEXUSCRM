@@ -1,8 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useTagDeIdioma } from "@/hooks/i18n/useLocaleDeData";
 import { Badge } from "@/components/ui/badge";
 import { Warning } from "@/lib/ui/icons";
+import {
+  modulosHabilitadosDaOrganizacao,
+  MODULOS_TENANT_CATALOGO,
+} from "@/lib/tenants/modulos-contratados";
 import type {
   TenantOrganization,
   TenantCounts,
@@ -188,6 +193,33 @@ export function TenantOverview({ organization, counts, integrations, cobrancaLig
               }
             />
             <InfoRow label={t("Invocações IA (30d)")} value={counts.ai_invocations_30d.toLocaleString("pt-BR")} />
+          </div>
+        </div>
+
+        {/* Módulos Contratados */}
+        <div className="rounded-lg border bg-card p-5 sm:col-span-2">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                {t("Módulos da Empresa")}
+              </h2>
+              <Badge variant="secondary" className="text-xs">
+                {modulosHabilitadosDaOrganizacao(organization.settings).length} de 7 ativos
+              </Badge>
+            </div>
+            <Link
+              href={`/admin/tenants/${organization.id}/modules`}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              {t("Gerenciar módulos")} →
+            </Link>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-1">
+            {modulosHabilitadosDaOrganizacao(organization.settings).map((modId) => (
+              <Badge key={modId} variant="outline" className="px-2.5 py-1 text-xs">
+                {MODULOS_TENANT_CATALOGO[modId]?.nome}
+              </Badge>
+            ))}
           </div>
         </div>
       </div>

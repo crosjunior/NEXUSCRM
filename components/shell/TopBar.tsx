@@ -5,10 +5,11 @@ import { MobileSidebar } from "./MobileSidebar";
 import { TenantSwitcher } from "./TenantSwitcher";
 import { UserMenu } from "./UserMenu";
 import { SearchTrigger } from "./SearchTrigger";
+import { BotaoGuiaRapido } from "@/components/help/GuiaRapidoDaPlataforma";
 
 export function TopBar() {
   return (
-    <header className="sticky top-[var(--faixas-de-cima,0px)] z-20 flex h-14 items-center justify-between gap-2 border-b bg-background/95 px-3 backdrop-blur md:gap-4 md:px-6">
+    <header className="sticky top-[var(--faixas-de-cima,0px)] z-20 flex h-16 items-center justify-between gap-2 border-b border-border bg-surface/95 px-3 backdrop-blur md:gap-4 md:px-6 shadow-theme-xs">
       <div className="flex min-w-0 items-center gap-2">
         <MobileSidebar />
         <TenantSwitcher />
@@ -17,6 +18,7 @@ export function TopBar() {
         <SearchTrigger />
       </div>
       <div className="flex shrink-0 items-center gap-2">
+        <BotaoGuiaRapido />
         <AlertsBell />
         <AvisoDePropostaEmDestaque />
         <UserMenu />

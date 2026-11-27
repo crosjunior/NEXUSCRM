@@ -14,6 +14,7 @@ dist/
 build/
 .turbo/
 .vercel/
+TEMPLATE/
 
 # Env — ignora todo .env*, exceto os templates de exemplo
 .env*

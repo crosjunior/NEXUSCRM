@@ -6,6 +6,7 @@ import { AlertsBanner } from "@/components/admin/dashboard/AlertsBanner";
 import { useAdminDashboardKPIs } from "@/hooks/useAdminDashboardKPIs";
 import { useAlertsRealtime } from "@/hooks/useAlertsRealtime";
 import { useT } from "@/hooks/i18n/useT";
+import { BannerDeAjudaDaPagina } from "@/components/help/GuiaRapidoDaPlataforma";
 
 function KPISkeleton() {
   return (
@@ -48,6 +49,13 @@ export function DashboardClient() {
           {t("Visão cross-tenant — atualiza a cada 30 segundos.")}
         </p>
       </div>
+
+      <BannerDeAjudaDaPagina
+        titulo={t("Gestão e Monitoramento de Tenants")}
+        descricao={t("Acompanhe organizações ativas, alertas de sessões e consumo acumulado de IA em tempo real.")}
+        acaoHref="/admin/tenants"
+        acaoRotulo={t("Ver Empresas")}
+      />
 
       {isLoading || !data ? (
         <>

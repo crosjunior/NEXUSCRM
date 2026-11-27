@@ -54,6 +54,7 @@ import {
 } from "./catalogo";
 import type { ModuloOpcional } from "@/lib/instalacao/modulos";
 import type { CapacidadeDaOrganizacao } from "@/lib/organizacao/capacidades";
+import type { ModuloTenant } from "@/lib/tenants/modulos-contratados";
 
 import { destinosDaInterface, type InterfaceSettings } from "./interface";
 export { NAV_GROUPS, GRUPO_NO_RODAPE } from "./catalogo";
@@ -123,9 +124,19 @@ export function sidebarGroups(
   settings?: InterfaceSettings,
   modulos?: readonly ModuloOpcional[],
   capacidades?: readonly CapacidadeDaOrganizacao[],
+  modulosTenant?: readonly ModuloTenant[],
+  recursosTenant?: readonly string[],
 ): Array<{ group: NavGroup; items: NavDestination[] }> {
   const visible = new Set<string>(
-    destinosDaInterface(settings, isPlatformAdmin, role, modulos, capacidades).map((d) => d.href),
+    destinosDaInterface(
+      settings,
+      isPlatformAdmin,
+      role,
+      modulos,
+      capacidades,
+      modulosTenant,
+      recursosTenant,
+    ).map((d) => d.href),
   );
   return NAV_GROUPS.map((group) => ({
     group,
@@ -156,10 +167,20 @@ export function hubSections(
   settings?: InterfaceSettings,
   modulos?: readonly ModuloOpcional[],
   capacidades?: readonly CapacidadeDaOrganizacao[],
+  modulosTenant?: readonly ModuloTenant[],
+  recursosTenant?: readonly string[],
 ): Array<{ section: string; items: NavDestination[] }> {
   const porSecao = new Map<string, NavDestination[]>();
   const visible = new Set<string>(
-    destinosDaInterface(settings, isPlatformAdmin, role, modulos, capacidades).map((d) => d.href),
+    destinosDaInterface(
+      settings,
+      isPlatformAdmin,
+      role,
+      modulos,
+      capacidades,
+      modulosTenant,
+      recursosTenant,
+    ).map((d) => d.href),
   );
   for (const d of NAV_DESTINATIONS) {
     if (d.group !== group || !visible.has(d.href)) continue;
@@ -178,9 +199,19 @@ export function searchable(
   settings?: InterfaceSettings,
   modulos?: readonly ModuloOpcional[],
   capacidades?: readonly CapacidadeDaOrganizacao[],
+  modulosTenant?: readonly ModuloTenant[],
+  recursosTenant?: readonly string[],
 ): NavDestination[] {
   const visible = new Set<string>(
-    destinosDaInterface(settings, isPlatformAdmin, role, modulos, capacidades).map((d) => d.href),
+    destinosDaInterface(
+      settings,
+      isPlatformAdmin,
+      role,
+      modulos,
+      capacidades,
+      modulosTenant,
+      recursosTenant,
+    ).map((d) => d.href),
   );
   return NAV_DESTINATIONS.filter((d) => visible.has(d.href));
 }

@@ -1,6 +1,7 @@
 import type { ModuloOpcional } from "@/lib/instalacao/modulos";
 import type { CapacidadeDaOrganizacao } from "@/lib/organizacao/capacidades";
 import type { InterfaceSettings } from "@/lib/navigation/interface";
+import type { ModuloTenant } from "@/lib/tenants/modulos-contratados";
 import Link from "next/link";
 
 import { Card } from "@/components/ui/card";
@@ -24,6 +25,10 @@ interface NavHubProps {
   modulosLigados: readonly ModuloOpcional[];
   /** Capacidades que a organização ligou. Ausente = o hub não filtra por capacidade. */
   capacidadesLigadas?: readonly CapacidadeDaOrganizacao[];
+  /** Módulos de negócio contratados pelo tenant. */
+  modulosTenant?: readonly ModuloTenant[];
+  /** Recursos individuais liberados para o tenant. */
+  recursosTenant?: readonly string[];
   group: NavGroupId;
   isPlatformAdmin: boolean;
   role: Role | null;
@@ -44,6 +49,43 @@ const EXTENSION_ICONS: Record<ExtensionManifest["display"]["icon"], typeof ListC
   ListChecks,
   BookOpen,
   Lightbulb,
+};
+
+const DICAS_JORNADA: Record<string, { titulo: string; passos: string[] }> = {
+  ia: {
+    titulo: "Passo a passo recomendado para colocar sua IA no ar:",
+    passos: [
+      "1. Credenciais & Modelos: conecte seu provedor preferido em Credenciais",
+      "2. Instruções do Agente: defina a personalidade, tom de voz e regras de atendimento",
+      "3. Base de Conhecimento: adicione manuais, produtos e PDFs para o agente consultar",
+      "4. Atendimento & Casos: ative nos canais e acompanhe as conversas em tempo real",
+    ],
+  },
+  crm: {
+    titulo: "Passo a passo recomendado para acelerar suas vendas:",
+    passos: [
+      "1. Funil de Vendas: ajuste as fases de negociação conforme seu processo comercial",
+      "2. Contatos & Leads: importe ou cadastre seus clientes e empresas",
+      "3. Produtos & Catálogo: cadastre seus itens com preços para facilitar cotações",
+      "4. Propostas Comerciais: envie propostas em PDF diretamente pelo WhatsApp",
+    ],
+  },
+  atendimento: {
+    titulo: "Passo a passo recomendado para a operação de atendimento:",
+    passos: [
+      "1. Agenda & Horários: defina os tipos de agendamento e compromissos",
+      "2. Respostas Rápidas: crie mensagens prontas com atalhos para agilizar o suporte",
+      "3. Radar de Clientes: monitore contatos que esfriaram para resgate ativo",
+    ],
+  },
+  configuracao: {
+    titulo: "Gestão completa da organização:",
+    passos: [
+      "1. Marca & Identidade: configure logotipo e cores da sua empresa",
+      "2. Equipe & Acessos: convide operadores e defina papéis de acesso",
+      "3. Canais & WhatsApp: conecte e monitore os números de atendimento",
+    ],
+  },
 };
 
 /**
@@ -81,18 +123,50 @@ export function NavHub({
   interfaceSettings,
   modulosLigados,
   capacidadesLigadas,
+  modulosTenant,
+  recursosTenant,
   locale = IDIOMA_PADRAO,
   extensionGuides = [],
   extensionsUnavailable = false,
 }: NavHubProps) {
-  const secoes = hubSections(group, isPlatformAdmin, role, interfaceSettings, modulosLigados, capacidadesLigadas);
+  const secoes = hubSections(
+    group,
+    isPlatformAdmin,
+    role,
+    interfaceSettings,
+    modulosLigados,
+    capacidadesLigadas,
+    modulosTenant,
+    recursosTenant,
+  );
+
+  const dica = DICAS_JORNADA[group];
 
   return (
-    <div className="flex h-full flex-col gap-8 p-6">
-      <header>
+    <div className="flex h-full flex-col gap-6 p-6">
+      <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">{traduzir(title, locale)}</h1>
         {subtitle && <p className="text-sm text-muted-foreground">{traduzir(subtitle, locale)}</p>}
       </header>
+
+      {dica && (
+        <div className="rounded-xl border border-brand-500/20 bg-brand-500/5 p-4 shadow-theme-xs">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+            <Lightbulb size={16} aria-hidden />
+            <span>{traduzir(dica.titulo, locale)}</span>
+          </div>
+          <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4">
+            {dica.passos.map((passo, idx) => (
+              <div
+                key={idx}
+                className="rounded-lg border border-border/40 bg-card/60 p-2.5 text-xs text-muted-foreground transition-colors hover:border-brand-500/40 hover:text-foreground"
+              >
+                {traduzir(passo, locale)}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {secoes.map(({ section, items }) => (
         <section
@@ -110,17 +184,21 @@ export function NavHub({
             {items.map((item) => {
               const Icon = item.icon;
               return (
-                <Link key={item.href} href={item.href} className="block">
-                  <Card className="flex h-full gap-3 p-4 transition-colors hover:border-border-strong">
-                    <Icon
-                      size={20}
-                      weight="regular"
-                      aria-hidden
-                      className="mt-0.5 shrink-0 text-muted-foreground"
-                    />
-                    <div>
-                      <h3 className="text-sm font-semibold">{traduzir(item.label, locale)}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">
+                <Link key={item.href} href={item.href} className="group block">
+                  <Card className="flex h-full items-start gap-3.5 rounded-xl border border-border/60 bg-card p-4 shadow-theme-xs transition-all hover:border-brand-500/40 hover:shadow-theme-sm">
+                    <div className="rounded-lg bg-brand-50 p-2 text-brand-600 transition-colors group-hover:bg-brand-500 group-hover:text-white dark:bg-brand-500/15 dark:text-brand-400 dark:group-hover:bg-brand-500 dark:group-hover:text-white">
+                      <Icon
+                        size={20}
+                        weight="regular"
+                        aria-hidden
+                        className="shrink-0"
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold text-foreground group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">
+                        {traduzir(item.label, locale)}
+                      </h3>
+                      <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
                         {traduzir(item.description, locale)}
                       </p>
                     </div>

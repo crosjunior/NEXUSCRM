@@ -63,6 +63,8 @@ export default async function CrmHubPage() {
       role={activeOrg?.role ?? null}
       interfaceSettings={activeOrg?.interface_settings}
       modulosLigados={await modulosLigados(createAdminClient())}
+      modulosTenant={activeOrg?.modulos_habilitados}
+      recursosTenant={activeOrg?.recursos_habilitados}
       title={traduzir("CRM", idioma)}
       subtitle={traduzir(
         "Onde a venda acontece — e o que você define uma vez para ela funcionar.",

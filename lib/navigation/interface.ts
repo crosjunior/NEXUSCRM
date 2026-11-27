@@ -3,6 +3,11 @@ import { z } from "zod";
 import { ROLE_RANK, type Role } from "@/lib/auth/types";
 import type { ModuloOpcional } from "@/lib/instalacao/modulos";
 import type { CapacidadeDaOrganizacao } from "@/lib/organizacao/capacidades";
+import {
+  rotaPermitidaPelosModulos,
+  type ModuloTenant,
+  MODULOS_TENANT_TODOS,
+} from "@/lib/tenants/modulos-contratados";
 import { NAV_CATALOG, type NavMetadata, type NavDestinationId } from "./catalogo";
 
 const ids = NAV_CATALOG.map((d) => d.href);
@@ -79,22 +84,16 @@ const SIMPLIFICADA: readonly NavDestinationId[] = [
  * duas entra em `ESSENCIAIS_DE_ADMIN`: sendo pessoais, ficam visíveis para todo
  * vínculo em qualquer preset, como Perfil e Segurança.
  */
-/** Rotas temporariamente ocultas e desativadas no MVP */
-export const ROTAS_OCULTAS_MVP: readonly string[] = [
-  "/app/campaigns",
-  "/app/comandas",
-  "/app/ai/providers",
-  "/app/ai/tools",
-  "/app/calls",
-  "/app/settings/api-tokens",
-  "/app/extensions",
-  "/app/settings/aplicativo",
-];
+/**
+ * Rotas legadas do MVP (substituído pelo controle dinâmico modular por tenant).
+ */
+export const ROTAS_OCULTAS_MVP: readonly string[] = [];
 
 export const PORTAS_ESSENCIAIS = [
   "/app/settings/profile",
   "/app/settings/security",
   "/app/settings/notifications",
+  "/app/settings/aplicativo",
   "/app/team",
   "/app/settings/tenant",
 ] as const;
@@ -131,13 +130,18 @@ export function permitidos(
   role: Role | null,
   modulos?: readonly ModuloOpcional[],
   capacidades?: readonly CapacidadeDaOrganizacao[],
+  modulosTenant?: readonly ModuloTenant[],
+  recursosTenant?: readonly string[],
 ): NavMetadata[] {
   return (NAV_CATALOG as readonly NavMetadata[]).filter(
     (d) =>
       !ROTAS_OCULTAS_MVP.includes(d.href) &&
       canSee(d, platform, role) &&
       (!modulos || !d.modulo || modulos.includes(d.modulo)) &&
-      (!capacidades || !d.capacidade || capacidades.includes(d.capacidade)),
+      (!capacidades || !d.capacidade || capacidades.includes(d.capacidade)) &&
+      (platform ||
+        (!modulosTenant && !recursosTenant) ||
+        rotaPermitidaPelosModulos(d.href, modulosTenant ?? MODULOS_TENANT_TODOS, recursosTenant)),
   );
 }
 /** Leitura tolera versões antigas/removidas sem lançar no layout. */
@@ -181,9 +185,11 @@ export function destinosDaInterface(
   role: Role | null,
   modulos?: readonly ModuloOpcional[],
   capacidades?: readonly CapacidadeDaOrganizacao[],
+  modulosTenant?: readonly ModuloTenant[],
+  recursosTenant?: readonly string[],
 ): NavMetadata[] {
   const { settings } = lerInterface(raw);
-  const allowed = permitidos(platform, role, modulos, capacidades);
+  const allowed = permitidos(platform, role, modulos, capacidades, modulosTenant, recursosTenant);
   const chosen =
     settings.destinos ?? (settings.preset === "simplificada" ? SIMPLIFICADA : undefined);
   /**
@@ -227,8 +233,24 @@ export function interfaceTemDestino(
 ): boolean {
   return destinosDaInterface(settings, platform, role).some((d) => !essencial(d, role, platform));
 }
-export function homeDaInterface(raw: unknown, platform: boolean, role: Role | null): string {
-  const visible = destinosDaInterface(raw, platform, role);
+export function homeDaInterface(
+  raw: unknown,
+  platform: boolean,
+  role: Role | null,
+  modulos?: readonly ModuloOpcional[],
+  capacidades?: readonly CapacidadeDaOrganizacao[],
+  modulosTenant?: readonly ModuloTenant[],
+  recursosTenant?: readonly string[],
+): string {
+  const visible = destinosDaInterface(
+    raw,
+    platform,
+    role,
+    modulos,
+    capacidades,
+    modulosTenant,
+    recursosTenant,
+  );
   return (
     visible.find((d) => d.href === "/app/inbox")?.href ??
     visible.find((d) => !essencial(d, role, platform))?.href ??

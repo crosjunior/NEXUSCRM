@@ -2,6 +2,7 @@ import type { InterfaceSettings } from "@/lib/navigation/interface";
 import type { Idioma } from "@/lib/i18n/idiomas";
 import type { ModuloOpcional } from "@/lib/instalacao/modulos";
 import type { CapacidadeDaOrganizacao } from "@/lib/organizacao/capacidades";
+import type { ModuloTenant } from "@/lib/tenants/modulos-contratados";
 
 /**
  * Papéis dentro do tenant.
@@ -293,6 +294,16 @@ export interface ActiveOrg {
    * Só o layout de `/app` preenche; ausente vale como nenhuma no menu.
    */
   capacidades_ligadas?: readonly CapacidadeDaOrganizacao[];
+  /**
+   * Módulos de negócio contratados/liberados para ESTA organização (`lib/tenants/modulos-contratados.ts`).
+   * Ausente vale como todos liberados (retrocompatibilidade total).
+   */
+  modulos_habilitados?: readonly ModuloTenant[];
+  /**
+   * Recursos individuais liberados para ESTA organização (`lib/tenants/modulos-contratados.ts`).
+   * Ausente vale como todos os recursos dos módulos habilitados liberados.
+   */
+  recursos_habilitados?: readonly string[];
   /**
    * O que ESTA organização definiu para si — CAMPO A CAMPO, e só o que ela
    * mesma definiu.
