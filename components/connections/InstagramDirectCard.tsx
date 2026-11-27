@@ -220,11 +220,11 @@ export function InstagramDirectCard() {
           <div className="flex items-center gap-3">
             <select
               className="flex-1 rounded-md border bg-background p-2 text-sm"
-              value={selectedAgentId || state.agent_id || ""}
+              value={selectedAgentId || state?.agent_id || ""}
               onChange={(e) => setSelectedAgentId(e.target.value)}
             >
               <option value="">{t("Nenhum (Somente Atendimento Humano ou Automações)")}</option>
-              {state.available_agents.map((ag) => (
+              {(state?.available_agents ?? []).map((ag) => (
                 <option key={ag.id} value={ag.id}>
                   {ag.name} ({ag.role}) {ag.status === "published" ? "✓ Ativo" : ""}
                 </option>
@@ -234,7 +234,7 @@ export function InstagramDirectCard() {
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => saveAgentMutation.mutate(selectedAgentId || state.agent_id || null)}
+              onClick={() => saveAgentMutation.mutate(selectedAgentId || state?.agent_id || null)}
               disabled={saveAgentMutation.isPending}
             >
               {saveAgentMutation.isPending ? t("Salvando...") : t("Vincular Agente")}

@@ -26,15 +26,11 @@ export async function GET(req: NextRequest, ctx: RouteCtx): Promise<Response> {
   const { id: conversationId } = await ctx.params;
   const supabase = await createClient();
 
-  const {
-    data: { user },
-    error: authErr,
-  } = await supabase.auth.getUser();
-  if (authErr || !user) {
+  const authUser = await loadAuthUser();
+  if (!authUser) {
     return fail("unauthenticated", "Auth required.", 401, { requestId });
   }
-
-  const authUser = await loadAuthUser();
+  const user = authUser;
   const t = (texto: string) => traduzir(texto, authUser?.idioma ?? "pt-BR");
   const ativa = await orgAtivaDaApi(authUser, requestId);
   if (!ativa.ok) return ativa.response;

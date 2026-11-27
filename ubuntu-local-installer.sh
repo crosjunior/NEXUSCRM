@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DeskcommCRM - Instalador Automático (Local Ubuntu VM)
+# NexusCRM - Instalador Automático (Local Ubuntu VM)
 # Este script prepara a VM, sobe o Supabase local (PostgreSQL + Auth +
 # PostgREST + Storage + Realtime), inicializa os serviços da aplicação e cria
 # o usuário Admin.
@@ -36,9 +36,9 @@ fi
 
 # Se não estivermos na raiz do projeto, clona e entra nele.
 if [ ! -f "package.json" ]; then
-  step "Clonando o repositório DeskcommCRM..."
-  git clone https://github.com/melgarafael/DeskcommCRM.git
-  cd DeskcommCRM
+  step "Clonando o repositório NexusCRM..."
+  git clone https://github.com/crosjunior/NEXUSCRM.git
+  cd NEXUSCRM
 fi
 
 if ! command -v pnpm >/dev/null 2>&1; then

@@ -1035,6 +1035,54 @@ const HOSTS_DECLARADOS: Record<string, EntradaDeHost> = {
     categoria: "CONSOLE",
     motivo: "Google AI Studio — onde o usuário cria a chave do Gemini.",
   },
+  "console.groq.com": {
+    categoria: "CONSOLE",
+    motivo: "painel onde o usuário obtém sua chave de API da Groq.",
+  },
+  "docs.google.com": {
+    categoria: "FORNECEDOR",
+    motivo: "importação e sincronização de documentos Google Docs na base de conhecimento (RAG).",
+  },
+  "drive.google.com": {
+    categoria: "FORNECEDOR",
+    motivo: "importação e sincronização de arquivos Google Drive na base de conhecimento (RAG).",
+  },
+  "onedrive.live.com": {
+    categoria: "FORNECEDOR",
+    motivo: "importação e sincronização de arquivos OneDrive na base de conhecimento (RAG).",
+  },
+  "sharepoint.com": {
+    categoria: "FORNECEDOR",
+    motivo: "importação e sincronização de arquivos SharePoint na base de conhecimento (RAG).",
+  },
+  "login.live.com": {
+    categoria: "FORNECEDOR",
+    motivo: "autenticação OAuth pessoal da Microsoft para acesso a OneDrive.",
+  },
+  "login.microsoftonline.com": {
+    categoria: "FORNECEDOR",
+    motivo: "autenticação OAuth corporativa da Microsoft Azure AD para Outlook e Teams.",
+  },
+  "graph.microsoft.com": {
+    categoria: "FORNECEDOR",
+    motivo: "API Microsoft Graph para sincronização de calendário Outlook e criação de reuniões Teams.",
+  },
+  "teams.live.com": {
+    categoria: "FORNECEDOR",
+    motivo: "reconhecimento de links de reuniões Microsoft Teams.",
+  },
+  "teams.microsoft.com": {
+    categoria: "FORNECEDOR",
+    motivo: "reconhecimento de links de reuniões Microsoft Teams corporativo.",
+  },
+  "api.groq.com": {
+    categoria: "FORNECEDOR",
+    motivo: "endpoint da API da Groq para execução de LLM rápida de baixo custo.",
+  },
+  "api.x.ai": {
+    categoria: "FORNECEDOR",
+    motivo: "endpoint da API da xAI (Grok) para execução de modelos de IA.",
+  },
   "allmylinks.com": {
     categoria: "RECONHECIMENTO",
     motivo:
@@ -1075,6 +1123,18 @@ const HOSTS_DECLARADOS: Record<string, EntradaDeHost> = {
     categoria: "AMOSTRA",
     motivo:
       "placeholder do campo de client id do Google: exibe o FORMATO do identificador (e o host que ele carrega) para quem vai criar a credencial no console.",
+  },
+  "exemplo.com": {
+    categoria: "AMOSTRA",
+    motivo: "placeholder de exemplo de URL em formulários da interface.",
+  },
+  "exemplo.com.br": {
+    categoria: "AMOSTRA",
+    motivo: "placeholder de exemplo de URL em formulários da interface.",
+  },
+  "seusite.com.br": {
+    categoria: "AMOSTRA",
+    motivo: "placeholder de exemplo de domínio em formulário de fluxos e automações.",
   },
   // ── entrada conferida e identificador de fio ─────────────────────────────
   "meet.google.com": {
@@ -1345,10 +1405,13 @@ describe("catraca de host de terceiro no código que embarca", () => {
       // apenas `api.openai.com` no fluxo SIWC.
       "chatgpt.com",
       "console.anthropic.com",
+      "console.groq.com",
       // Decisão escrita: é o painel de chaves do Jev, o mesmo caso dos outros
       // CONSOLE — o link "Onde pegar a chave" da tela de Credenciais.
       "console.typesafe.ai",
       "deskcomm.app",
+      "exemplo.com",
+      "exemplo.com.br",
       // Decisão escrita (spec 24, auditoria de site): marca agregador e conta
       // como link social no raio-X — nunca chamada, nunca exibida (a tela mostra
       // o rótulo traduzido).
@@ -1396,6 +1459,7 @@ describe("catraca de host de terceiro no código que embarca", () => {
       // protocolo manda. Entrou aqui porque a régua nova do #914 passou a
       // enxergá-lo, e não porque o produto ganhou host novo.
       "s.whatsapp.net",
+      "seusite.com.br",
       // Decisão escrita (spec 24, auditoria de site): assinatura de construtor
       // (Google Sites) — nunca chamada, nunca exibida.
       "sites.google.com",

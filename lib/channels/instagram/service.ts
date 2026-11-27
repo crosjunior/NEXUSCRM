@@ -541,9 +541,9 @@ export async function processInstagramWebhookEvent(
         if (!r.active || !r.flow_graph?.nodes?.length) continue;
         for (const n of r.flow_graph.nodes) {
           if (n.type === "message") {
-            const d = n.data as import("./flow-engine").FlowMessageData;
+            const d = n.data as import("./types").FlowMessageData;
             const btn = (d.buttons ?? []).find(
-              (b) => b.id === event.payload || b.title.trim().toLowerCase() === matchText,
+              (b: { id: string; title: string }) => b.id === event.payload || b.title.trim().toLowerCase() === matchText,
             );
             if (btn) {
               rule = r;
@@ -552,7 +552,7 @@ export async function processInstagramWebhookEvent(
               break;
             }
             const qr = (d.quickReplies ?? []).find(
-              (q) => q.id === event.payload || q.title.trim().toLowerCase() === matchText,
+              (q: { id: string; title: string }) => q.id === event.payload || q.title.trim().toLowerCase() === matchText,
             );
             if (qr) {
               rule = r;
@@ -742,16 +742,16 @@ export async function processInstagramWebhookEvent(
           if (!r.active || !r.flow_graph?.nodes?.length) continue;
           for (const n of r.flow_graph.nodes) {
             if (n.type === "message") {
-              const d = n.data as import("./flow-engine").FlowMessageData;
+              const d = n.data as import("./types").FlowMessageData;
               const btn = (d.buttons ?? []).find(
-                (b) => b.type === "postback" && b.title.trim().toLowerCase() === cleanText,
+                (b: { type?: string; title: string; id: string }) => b.type === "postback" && b.title.trim().toLowerCase() === cleanText,
               );
               if (btn) {
                 flowButtonMatch = { rule: r, nodeId: n.id, buttonId: btn.id, title: btn.title };
                 break;
               }
               const qr = (d.quickReplies ?? []).find(
-                (q) => q.title.trim().toLowerCase() === cleanText,
+                (q: { title: string; id: string }) => q.title.trim().toLowerCase() === cleanText,
               );
               if (qr) {
                 flowButtonMatch = { rule: r, nodeId: n.id, buttonId: qr.id, title: qr.title };

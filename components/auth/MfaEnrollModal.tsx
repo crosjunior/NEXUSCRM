@@ -86,9 +86,10 @@ export function MfaEnrollModal({ motivo = "obrigatorio" }: { motivo?: "obrigator
           } else if (res.error === "mfa_required") {
             setError(t("É necessário confirmar o fator MFA atual antes de cadastrar outro."));
           } else {
+            const extraMsg = "message" in res && typeof res.message === "string" ? res.message : undefined;
             setError(
-              res.message
-                ? `${t("Falha ao confirmar.")} ${res.message}`
+              extraMsg
+                ? `${t("Falha ao confirmar.")} ${extraMsg}`
                 : t("Falha ao confirmar. Tente novamente."),
             );
           }

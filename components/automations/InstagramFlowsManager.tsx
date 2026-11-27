@@ -203,7 +203,7 @@ export function InstagramFlowsManager() {
   const totalRules = rules.length;
   const activeRules = rules.filter((r) => r.active).length;
   const totalTriggers = executions.length;
-  const totalDmSent = executions.filter((e) => e.status === "success" || e.status === "dm_only").length;
+  const totalDmSent = executions.filter((e) => (e.status as string) === "success" || e.status === "dm_only" || e.status === "replied").length;
 
   function openNewRuleForm(initialMode: "basic" | "visual" = "visual") {
     setEditingRuleId(null);

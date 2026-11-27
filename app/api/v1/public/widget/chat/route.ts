@@ -163,8 +163,7 @@ export async function POST(req: NextRequest) {
         knowledgeSourceIds: sourceIds,
         pergunta: message,
         limiar: 0.35,
-        quantidade: 5,
-        autor: "ai",
+        topK: 5,
       });
 
       if (searchRes.trechos && searchRes.trechos.length > 0) {
@@ -239,7 +238,7 @@ export async function POST(req: NextRequest) {
       model,
       messages: chatMessages,
       temperature: 0.4,
-      maxTokens: 600,
+      maxOutputTokens: 600,
     });
 
     return NextResponse.json(

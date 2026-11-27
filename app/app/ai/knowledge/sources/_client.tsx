@@ -182,7 +182,7 @@ export function AcervoClient({ initialSources, initialChave, agentes }: Props) {
                     <Icone className="h-4 w-4 shrink-0 text-text-muted" aria-hidden />
                     <span className="font-medium text-sm truncate">{s.name}</span>
                     <span className="rounded bg-muted/50 px-1.5 py-0.5 text-xs text-text-muted">
-                      {(tipo && TIPO_DE_FONTE_POR_ID[tipo]) ?? tipo ?? s.source_type}
+                      {(tipo && TIPO_DE_FONTE_POR_ID.get(tipo)?.rotulo) ?? tipo ?? s.source_type}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">

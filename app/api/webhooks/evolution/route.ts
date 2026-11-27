@@ -61,10 +61,10 @@ export async function POST(req: NextRequest): Promise<Response> {
             ? ("connecting" as const)
             : ("disconnected" as const);
 
-      const client = new EvolutionClient({
-        serverUrl: connections.evolution.server_url,
-        apiKey: connections.evolution.api_key || process.env.EVOLUTION_API_KEY,
-      });
+      const client = new EvolutionClient(
+        connections.evolution.server_url,
+        connections.evolution.api_key || process.env.EVOLUTION_API_KEY,
+      );
 
       // Se a conexão abriu, garante configurações de estabilidade ativas (Always Online)
       if (nextStatus === "connected") {

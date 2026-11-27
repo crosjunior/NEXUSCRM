@@ -791,7 +791,7 @@ export function EvolutionWhatsAppCard({
                 id="pair-phone"
                 value={pairPhone}
                 onChange={(e) => setPairPhone(e.target.value)}
-                placeholder="+55 (34) 95330-9898"
+                placeholder="+55 (11) 99999-9999"
               />
             </div>
 
@@ -833,7 +833,7 @@ export function EvolutionWhatsAppCard({
                 id="test-phone"
                 value={testPhone}
                 onChange={(e) => setTestPhone(e.target.value)}
-                placeholder="+55 (34) 95330-9898"
+                placeholder="+55 (11) 99999-9999"
               />
             </div>
             <div className="space-y-1.5">

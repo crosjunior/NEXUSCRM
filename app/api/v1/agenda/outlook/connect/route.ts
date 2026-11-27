@@ -21,8 +21,8 @@ export async function GET(req: NextRequest) {
 
   const state = Buffer.from(
     JSON.stringify({
-      org: authz.orgId,
-      uid: authz.userId,
+      org: authz.org.orgId,
+      uid: authz.user.id,
       nonce: randomBytes(16).toString("hex"),
       ts: Date.now(),
     }),

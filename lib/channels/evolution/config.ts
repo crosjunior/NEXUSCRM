@@ -6,10 +6,10 @@ import type {
   WhatsappConnectionsSettings,
 } from "./types";
 
-export const DEFAULT_EVOLUTION_SERVER_URL = "https://evol.nexusia.work";
-export const DEFAULT_EVOLUTION_INSTANCE_NAME = "NexusReplay";
-export const DEFAULT_EVOLUTION_INSTANCE_ID = "1fe77663-64a4-412e-b088-06b84486a74c";
-export const DEFAULT_EVOLUTION_PHONE = "+55 (34) 95330-9898";
+export const DEFAULT_EVOLUTION_SERVER_URL = "";
+export const DEFAULT_EVOLUTION_INSTANCE_NAME = "";
+export const DEFAULT_EVOLUTION_INSTANCE_ID = "";
+export const DEFAULT_EVOLUTION_PHONE = "";
 export const EVOLUTION_WEBHOOK_PATH = "/api/webhooks/evolution";
 
 export function buildEvolutionManagerUrl(serverUrl: string, instanceId: string): string {
@@ -38,7 +38,7 @@ export function defaultWhatsappConnectionsSettings(): WhatsappConnectionsSetting
       api_key: null,
       channel: "Baileys",
       phone_number: DEFAULT_EVOLUTION_PHONE,
-      status: "connected",
+      status: "disconnected",
       webhook_url: EVOLUTION_WEBHOOK_PATH,
       webhook_synced: true,
       last_checked_at: null,

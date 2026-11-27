@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     }
 
     void audit({
-      action: "calendar.connected",
+      action: "agenda.outlook.conexao_concluida",
       actorUserId: state.uid,
       organizationId: state.org,
       resourceType: "calendar_connection",

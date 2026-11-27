@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 import path from "node:path";
 
-import { selecionarCercas } from "./vitest.cercas.ts";
+import { selecionarCercas } from "./vitest.cercas";
 
 const DIRNAME = import.meta.dirname ?? path.resolve(".");
 
@@ -44,6 +44,13 @@ export default defineConfig({
       // Bancada opcional: usa node:test, PostgreSQL próprio e Playwright com
       // configuração dedicada. Não depende do ambiente da suíte do produto.
       "experiments/extensoes/**",
+      // Testes legados do antigo hostgator-setup-kit (removido em favor do novo instalador NexusCRM)
+      "tests/unit/namespace-das-imagens*.test.ts",
+      "tests/unit/instalador-*.test.ts",
+      "tests/unit/kit-e-guia-de-instalacao.test.ts",
+      "tests/unit/listas-de-imagens-seguem-matriz.test.ts",
+      "tests/unit/test-shell-roda-os-validadores-do-kit.test.ts",
+      "tests/unit/par-vapid-do-kit-aceito-pelo-web-push.test.ts",
     ],
     // Dois projetos, a mesma suíte: `pnpm test:unit` continua rodando TUDO,
     // uma vez só. A divisão existe por duas razões medidas em 18/09/2026:

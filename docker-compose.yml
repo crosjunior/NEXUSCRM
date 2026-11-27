@@ -20,7 +20,7 @@ services:
   waha:
     image: devlikeapro/waha:noweb
     platform: linux/amd64
-    container_name: deskcomm-waha
+    container_name: nexus-waha
     restart: unless-stopped
     ports:
       - "3030:3000"
@@ -70,7 +70,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.worker
-    container_name: deskcomm-agent-worker
+    container_name: nexus-agent-worker
     restart: unless-stopped
     env_file:
       - .env

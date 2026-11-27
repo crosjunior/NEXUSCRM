@@ -934,8 +934,6 @@ function VisualNodeSideEditor({
           <AiNodeForm
             data={node.data as FlowAiData}
             onChange={onChangeData}
-            availableAgents={availableAgents}
-            availableKnowledgeSources={availableKnowledgeSources}
           />
         )}
 

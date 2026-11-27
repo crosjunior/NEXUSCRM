@@ -14,7 +14,8 @@
  * são públicos por design.
  */
 export const DEFAULT_SENTRY_DSN =
-  "https://58fabf8ad54504863d404a3647ef3714@o4509908078559232.ingest.us.sentry.io/4509908083212288";
+  process.env.DEFAULT_SENTRY_DSN ||
+  "https://00000000000000000000000000000000@o0.ingest.sentry.io/0";
 
 export function resolveSentryDsn(value: string | undefined | null): string | undefined {
   const v = (value ?? "").trim().toLowerCase() === "off" ? "off" : (value ?? "").trim();

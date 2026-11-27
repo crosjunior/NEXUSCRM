@@ -80,15 +80,11 @@ export async function GET(req: NextRequest): Promise<Response> {
   const requestId = randomUUID();
   const supabase = await createClient();
 
-  const {
-    data: { user },
-    error: authErr,
-  } = await supabase.auth.getUser();
-  if (authErr || !user) {
+  const authUser = await loadAuthUser();
+  if (!authUser) {
     return fail("unauthenticated", "Auth required.", 401, { requestId });
   }
-
-  const authUser = await loadAuthUser();
+  const user = authUser;
   const ativa = await orgAtivaDaApi(authUser, requestId);
   if (!ativa.ok) return ativa.response;
   const activeOrg = ativa.org;
